@@ -47,7 +47,7 @@ def test_conflicting_definitions(tmp_path: Path) -> None:
         "信息：没有经过处理的随机字符集合。[slides.md#page=1]",
         "信息是能够减少不确定性的内容。",
     )
-    assert codes == ["ST005"]
+    assert codes == ["ST005", "ST006"]
 
 
 def test_ignore_next_rule(tmp_path: Path) -> None:
@@ -69,7 +69,48 @@ def test_uncited_claim_has_evidence_suggestion(tmp_path: Path) -> None:
     )
 
     findings = lint(parse_notes(notes_path), [load_source(source_path)])
-    assert findings[0].code == "ST004"
+    assert findings[0].code == "ST007"
     assert findings[0].suggestions[0].source_name == "slides.md"
     assert findings[0].suggestions[0].locator_value == 4
     assert findings[0].suggestions[0].score >= 90
+
+
+def test_cited_claim_matches_marked_page(tmp_path: Path) -> None:
+    codes = _lint(
+        tmp_path,
+        "信息能够减少决策中的不确定性。[slides.md#页=2]",
+        "<!-- page: 2 -->\n信息能够减少决策中的不确定性。",
+    )
+    assert codes == []
+
+
+def test_cited_claim_does_not_match_marked_page(tmp_path: Path) -> None:
+    codes = _lint(
+        tmp_path,
+        "香农在1948年首次提出知识管理理论。[slides.md#p=2]",
+        "<!-- page: 2 -->\n本页介绍组织中的隐性知识与显性知识。",
+    )
+    assert codes == ["ST006"]
+
+
+def test_empty_cited_page_requires_manual_check(tmp_path: Path) -> None:
+    codes = _lint(
+        tmp_path,
+        "这条结论来自扫描图片页。[slides.md#page=2]",
+        "<!-- page: 2 -->\n",
+    )
+    assert codes == ["ST008"]
+
+
+def test_duplicate_source_names_are_ambiguous(tmp_path: Path) -> None:
+    notes_path = tmp_path / "notes.md"
+    notes_path.write_text("需要核对的结论。[slides.md#page=1]", encoding="utf-8")
+    first = tmp_path / "a" / "slides.md"
+    second = tmp_path / "b" / "slides.md"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.write_text("第一份资料", encoding="utf-8")
+    second.write_text("第二份资料", encoding="utf-8")
+
+    findings = lint(parse_notes(notes_path), [load_source(first), load_source(second)])
+    assert [finding.code for finding in findings] == ["ST009"]

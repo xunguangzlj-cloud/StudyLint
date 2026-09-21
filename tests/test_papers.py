@@ -133,3 +133,6 @@ def test_batch_report_contains_summary(monkeypatch) -> None:
 
     assert "共 <strong>2</strong> 篇" in report
     assert report.count("在知网搜索") == 2
+    assert 'target="_blank"' in report
+    assert "一键在知网核查全部 2 篇" in report
+    assert "openManualChecks" in report

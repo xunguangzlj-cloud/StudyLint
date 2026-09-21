@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -336,4 +337,8 @@ def verify_paper(query: str, email: str = "") -> PaperVerification:
 def verify_papers(queries: list[str], email: str = "") -> list[PaperVerification]:
     if not queries:
         raise ValueError("请至少输入一篇论文。")
-    return [verify_paper(query, email=email) for query in queries]
+    if len(queries) == 1:
+        return [verify_paper(queries[0], email=email)]
+    workers = min(4, len(queries))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        return list(executor.map(lambda query: verify_paper(query, email=email), queries))

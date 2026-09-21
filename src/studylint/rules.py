@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from functools import lru_cache
 
 from rapidfuzz import fuzz
 
@@ -20,17 +21,24 @@ QUOTE_PATTERN = re.compile(r"“([^”]{4,})”|\"([^\"]{4,})\"")
 DEFINITION_PATTERN = re.compile(
     r"^(?:[-*+]\s*)?(?:\*\*)?([^:：]{2,40}?)(?:\*\*)?\s*[:：]\s*(.+)$"
 )
+HIGH_RISK_FACT_PATTERN = re.compile(
+    r"\d|[%％]|表明|证明|导致|提高|降低|增加|减少|首次|唯一|最高|最低|必然|一定|超过|占比|率为"
+)
 
 
+@lru_cache(maxsize=2048)
 def _normalize(text: str) -> str:
     return re.sub(r"[^\w\u4e00-\u9fff]+", "", text).casefold()
 
 
-def _bigrams(text: str) -> set[str]:
+@lru_cache(maxsize=2048)
+def _bigrams(text: str) -> frozenset[str]:
     normalized = _normalize(text)
     if len(normalized) < 2:
-        return {normalized} if normalized else set()
-    return {normalized[index : index + 2] for index in range(len(normalized) - 1)}
+        return frozenset({normalized}) if normalized else frozenset()
+    return frozenset(
+        normalized[index : index + 2] for index in range(len(normalized) - 1)
+    )
 
 
 def _similarity(left: str, right: str) -> int:
@@ -44,6 +52,22 @@ def _similarity(left: str, right: str) -> int:
     jaccard = len(left_bigrams & right_bigrams) / len(union) if union else 0
     fuzzy = fuzz.partial_ratio(left_normalized, right_normalized) / 100
     return round((jaccard * 0.55 + fuzzy * 0.45) * 100)
+
+
+def _support_score(claim: str, source_text: str) -> int:
+    claim_normalized = _normalize(claim)
+    source_normalized = _normalize(source_text)
+    if not claim_normalized or not source_normalized:
+        return 0
+    claim_bigrams = _bigrams(claim)
+    source_bigrams = _bigrams(source_text)
+    coverage = (
+        len(claim_bigrams & source_bigrams) / len(claim_bigrams)
+        if claim_bigrams
+        else 0
+    )
+    fuzzy = fuzz.partial_ratio(claim_normalized, source_normalized) / 100
+    return round((coverage * 0.65 + fuzzy * 0.35) * 100)
 
 
 def _excerpt(text: str, limit: int = 180) -> str:
@@ -76,8 +100,11 @@ def _suggest_evidence(
     return tuple(candidates[:limit])
 
 
-def _source_map(sources: list[SourceDocument]) -> dict[str, SourceDocument]:
-    return {source.name.casefold(): source for source in sources}
+def _source_map(sources: list[SourceDocument]) -> dict[str, list[SourceDocument]]:
+    lookup: dict[str, list[SourceDocument]] = defaultdict(list)
+    for source in sources:
+        lookup[source.name.casefold()].append(source)
+    return dict(lookup)
 
 
 def _find_span(source: SourceDocument, citation: Citation) -> SourceSpan | None:
@@ -105,13 +132,13 @@ def _find_span(source: SourceDocument, citation: Citation) -> SourceSpan | None:
 
 
 def _citation_findings(
-    unit: NoteUnit, source_lookup: dict[str, SourceDocument]
+    unit: NoteUnit, source_lookup: dict[str, list[SourceDocument]]
 ) -> tuple[list[Finding], list[SourceSpan]]:
     findings: list[Finding] = []
     valid_spans: list[SourceSpan] = []
     for citation in unit.citations:
-        source = source_lookup.get(citation.source_name.casefold())
-        if source is None:
+        matching_sources = source_lookup.get(citation.source_name.casefold(), [])
+        if not matching_sources:
             findings.append(
                 Finding(
                     "ST001",
@@ -124,6 +151,20 @@ def _citation_findings(
                 )
             )
             continue
+        if len(matching_sources) > 1:
+            findings.append(
+                Finding(
+                    "ST009",
+                    "error",
+                    unit.line,
+                    f"资料目录中存在多个同名文件：{citation.source_name}",
+                    title="引用来源存在歧义",
+                    action="重命名同名文件，并同步修改笔记引用，确保来源唯一。",
+                    note_text=unit.text,
+                )
+            )
+            continue
+        source = matching_sources[0]
         span = _find_span(source, citation)
         if span is None:
             findings.append(
@@ -134,6 +175,19 @@ def _citation_findings(
                     f"{source.name} 中不存在 {citation.locator_type}={citation.raw_value}",
                     title="页码或时间点无效",
                     action="核对引用位置，并注意PDF文件页码可能与印刷页码不同。",
+                    note_text=unit.text,
+                )
+            )
+            continue
+        if not span.text.strip():
+            findings.append(
+                Finding(
+                    "ST008",
+                    "warning",
+                    unit.line,
+                    f"{source.name} 的指定位置没有可提取文字。",
+                    title="引用位置无法自动核验",
+                    action="该页可能是扫描图片；请人工查看原页，或先进行OCR再检查。",
                     note_text=unit.text,
                 )
             )
@@ -176,18 +230,55 @@ def _is_claim(text: str) -> bool:
     return len(re.sub(r"\s+", "", without_markdown)) >= 12
 
 
+def _claim_text(text: str) -> str:
+    without_citations = CITATION_PATTERN.sub("", text)
+    return re.sub(
+        r"^(?:[>*+-]\s*|\d+[.、)]\s*)", "", without_citations
+    ).strip()
+
+
+def _citation_support_finding(
+    unit: NoteUnit,
+    spans: list[SourceSpan],
+    sources: list[SourceDocument],
+) -> Finding | None:
+    if not unit.citations or not spans or QUOTE_PATTERN.search(unit.text):
+        return None
+    claim = _claim_text(unit.text)
+    if len(_normalize(claim)) < 8:
+        return None
+    score = max(_support_score(claim, span.text) for span in spans)
+    if score >= 28:
+        return None
+    return Finding(
+        "ST006",
+        "warning",
+        unit.line,
+        f"该结论与所标来源位置的文本关联较低（支持度 {score}%）。",
+        title="页码与笔记结论可能不匹配",
+        action="回到所标页码或时间点核对；若引用位置写错，请更正，若是概括请补充能对应原文的表述。",
+        note_text=unit.text,
+        suggestions=_suggest_evidence(claim, sources),
+    )
+
+
 def _missing_citation_finding(
     unit: NoteUnit, sources: list[SourceDocument]
 ) -> Finding | None:
     if unit.citations or not _is_claim(unit.text):
         return None
     suggestions = _suggest_evidence(unit.text, sources)
+    high_risk = bool(HIGH_RISK_FACT_PATTERN.search(_claim_text(unit.text)))
     return Finding(
-        "ST004",
+        "ST007" if high_risk else "ST004",
         "warning",
         unit.line,
-        "这条较长的笔记没有来源引用。",
-        title="结论缺少来源",
+        (
+            "这条包含数字、因果或绝对化表述的结论没有来源引用。"
+            if high_risk
+            else "这条较长的笔记没有来源引用。"
+        ),
+        title="高风险事实缺少来源" if high_risk else "结论缺少来源",
         action=(
             "核对下方可能相关的来源；确认后补充页码或时间点引用。"
             if suggestions
@@ -247,6 +338,9 @@ def lint(units: list[NoteUnit], sources: list[SourceDocument]) -> list[Finding]:
             for finding in _quote_findings(unit, spans)
             if finding.code not in unit.ignored_codes
         )
+        support = _citation_support_finding(unit, spans, sources)
+        if support and support.code not in unit.ignored_codes:
+            findings.append(support)
         missing = _missing_citation_finding(unit, sources)
         if missing:
             if missing.code not in unit.ignored_codes:

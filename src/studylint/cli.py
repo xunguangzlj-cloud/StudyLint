@@ -5,7 +5,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from studylint.parsers import discover_sources, load_source, parse_notes
+from studylint.parsers import discover_sources, load_sources, parse_notes
 from studylint.papers import PaperLookupError, parse_queries, read_query_file, verify_papers
 from studylint.reporters import (
     render_console,
@@ -104,7 +104,7 @@ def run_check(args: argparse.Namespace) -> int:
 
     try:
         units = parse_notes(args.notes)
-        sources = [load_source(path) for path in source_paths]
+        sources = load_sources(source_paths)
     except (OSError, ValueError) as error:
         print(str(error), file=sys.stderr)
         return 2

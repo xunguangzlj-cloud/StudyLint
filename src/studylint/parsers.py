@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from studylint.models import Citation, NoteUnit, SourceDocument, SourceSpan
 
 
 CITATION_PATTERN = re.compile(
-    r"\[(?P<source>[^\]#]+)#(?P<kind>page|time)=(?P<value>[^\]]+)\]"
+    r"\[(?P<source>[^\]#]+)#(?P<kind>page|p|页|页码|time|t|时间)=(?P<value>[^\]]+)\]",
+    re.I,
 )
 PAGE_MARKER_PATTERN = re.compile(r"^\s*<!--\s*page\s*:\s*(\d+)\s*-->\s*$", re.I)
 SRT_TIME_PATTERN = re.compile(
@@ -35,7 +37,8 @@ def parse_time(value: str) -> int | None:
 def extract_citations(text: str) -> tuple[Citation, ...]:
     citations: list[Citation] = []
     for match in CITATION_PATTERN.finditer(text):
-        kind = match.group("kind").lower()
+        raw_kind = match.group("kind").lower()
+        kind = "page" if raw_kind in {"page", "p", "页", "页码"} else "time"
         raw_value = match.group("value").strip()
         if kind == "page":
             try:
@@ -225,6 +228,14 @@ def load_source(path: Path) -> SourceDocument:
         supported = ", ".join(sorted(parsers))
         raise ValueError(f"Unsupported source type: {suffix or '(none)'}. Supported: {supported}")
     return parsers[suffix](path)
+
+
+def load_sources(paths: list[Path]) -> list[SourceDocument]:
+    if len(paths) <= 1:
+        return [load_source(path) for path in paths]
+    workers = min(8, len(paths))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        return list(executor.map(load_source, paths))
 
 
 def discover_sources(directory: Path, exclude: Path | None = None) -> list[Path]:

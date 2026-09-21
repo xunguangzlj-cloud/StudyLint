@@ -4,6 +4,7 @@ from studylint.parsers import (
     discover_sources,
     extract_citations,
     load_source,
+    load_sources,
     parse_notes,
     parse_time,
 )
@@ -22,6 +23,14 @@ def test_extract_citations() -> None:
     assert [(item.source_name, item.locator_type, item.locator_value) for item in citations] == [
         ("slides.pdf", "page", 12),
         ("lecture.srt", "time", 1902),
+    ]
+
+    aliases = extract_citations(
+        "内容 [slides.pdf#页码=3] [lecture.srt#t=00:00:10]"
+    )
+    assert [(item.locator_type, item.locator_value) for item in aliases] == [
+        ("page", 3),
+        ("time", 10),
     ]
 
 
@@ -103,3 +112,13 @@ def test_discover_sources_excludes_notes(tmp_path: Path) -> None:
 
     found = discover_sources(tmp_path, exclude=notes)
     assert [path.name for path in found] == ["lecture.srt", "slides.pdf"]
+
+
+def test_load_sources_preserves_input_order(tmp_path: Path) -> None:
+    first = tmp_path / "first.md"
+    second = tmp_path / "second.md"
+    first.write_text("第一份", encoding="utf-8")
+    second.write_text("第二份", encoding="utf-8")
+
+    documents = load_sources([second, first])
+    assert [document.name for document in documents] == ["second.md", "first.md"]

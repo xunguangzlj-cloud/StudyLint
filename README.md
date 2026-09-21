@@ -4,15 +4,15 @@
 
 <h1 align="center">StudyLint</h1>
 
-<p align="center"><strong>让每条学习笔记都能追溯来源。</strong></p>
+<p align="center"><strong>打破学习中的AI幻觉：核查笔记事实，也核查论文引用。</strong></p>
 
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-4338CA">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-2DD4BF">
-  <img alt="Version 0.4" src="https://img.shields.io/badge/Version-0.4-F59E0B">
+  <img alt="Version 0.5" src="https://img.shields.io/badge/Version-0.5-F59E0B">
 </p>
 
-StudyLint 是一个本地运行的课程笔记检查工具。把笔记和课程材料交给它，它会检查失效引用、不匹配的原文、缺少来源的结论和冲突定义，并生成可点击来源的中文报告。
+StudyLint 是一个面向AI学习场景的证据核查工具。把AI整理的笔记和可信课程材料交给它，它会检查失效引用、页码与结论不匹配、直接引语错误、高风险事实缺少来源和冲突定义；把AI生成的参考文献交给它，它会批量核验开放元数据并提供人工检索入口。
 
 它不会把“相似文本”冒充已验证事实，也不需要账号或大模型API。
 
@@ -24,8 +24,10 @@ StudyLint 是一个本地运行的课程笔记检查工具。把笔记和课程�
 
 - **自动发现课程材料**：选择资料文件夹即可递归读取支持的文件。
 - **检查页码和时间点**：发现不存在的PDF页码、PPT页码或字幕时间点。
+- **核对页码是否支持结论**：不是只判断页码存在，还检查笔记内容与指定位置是否有明显文本关联。
 - **核对直接引语**：检查引号内的原文能否在指定来源位置找到。
-- **发现缺少来源的结论**：标记较长但没有引用的笔记内容。
+- **发现高风险事实**：优先标记没有来源的数字、因果关系和绝对化表述。
+- **识别无法自动核验的页**：扫描图片页、空文本页和同名来源会单独提示，而不是误判内容错误。
 - **推荐可能证据**：使用本地文本匹配提供最多3条候选来源，由用户最终确认。
 - **发现冲突定义**：提示同一术语在笔记中出现差异较大的定义。
 - **离线HTML报告**：显示问题原因、修改建议、笔记原文和可点击来源。
@@ -51,12 +53,12 @@ studylint gui
 
 1. 选择一份`.md`、`.txt`或`.docx`笔记；
 2. 选择存放PPT、PDF和课堂转写的资料文件夹；
-3. 点击“开始检查并打开报告”；
-4. 在浏览器中查看错误、警告和证据候选。
+3. 点击“开始事实与引用核查”；
+4. 在浏览器中分别查看确定错误、事实支持不足、内部冲突和证据候选。
 
-核实AI生成的论文时，切换到“论文核验”标签页，每行粘贴一个DOI、论文标题或完整参考文献，然后点击“开始批量核验”。也可以导入TXT或CSV清单。输入区支持右键剪切、复制、粘贴和全选。DOI核验最准确；题名检索仍需核对作者、年份和期刊。
+核实AI生成的论文时，切换到“AI论文引用核查”标签页，每行粘贴一个DOI、论文标题或完整参考文献，然后点击“开始批量核验”。也可以导入TXT或CSV清单。输入区支持右键剪切、复制、粘贴和全选。报告中的人工检索链接会在新标签页打开，也可以一键打开全部论文的知网核查页。
 
-所有材料只在本机处理。生成的报告保存在笔记旁边：
+笔记与课程材料只在本机处理。生成的报告保存在笔记旁边：
 
 ```text
 原文件：信息管理复习笔记.docx
@@ -119,8 +121,8 @@ studylint paper --file papers.txt --format html --open
 
 退出码：
 
-- `0`：没有错误，可能仍有警告；
-- `1`：至少发现一个错误；
+- `0`：笔记没有错误，或全部论文都有开放数据库候选；
+- `1`：笔记至少有一个错误，或至少一篇论文没有可靠候选；
 - `2`：输入文件、参数或资料目录无效。
 
 ## 支持格式
@@ -140,6 +142,8 @@ studylint paper --file papers.txt --format html --open
 信息具有可传递性。[slides.pdf#page=12]
 老师强调需要理解该概念。[lecture.srt#time=00:31:42]
 ```
+
+页码还可以写成`#p=12`、`#页=12`或`#页码=12`；时间点还可以写成`#t=00:31:42`或`#时间=00:31:42`。StudyLint会先确认位置存在，再检查结论与该位置文本是否匹配。
 
 Markdown或TXT来源可以用标记模拟页码：
 
@@ -175,8 +179,19 @@ Markdown或TXT来源可以用标记模拟页码：
 | `ST003` | 错误 | 引号内的原文没有出现在引用位置 |
 | `ST004` | 警告 | 较长的笔记结论没有来源引用 |
 | `ST005` | 警告 | 同一术语出现差异较大的定义 |
+| `ST006` | 警告 | 笔记结论与所标页码或时间点缺少明显关联 |
+| `ST007` | 警告 | 数字、因果或绝对化高风险事实没有来源 |
+| `ST008` | 警告 | 引用位置没有可提取文字，无法自动核验 |
+| `ST009` | 错误 | 资料目录存在同名文件，引用来源不明确 |
 
-`ST003`只检查中文或英文引号中的直接引语，不会判断改写后的句子是否语义正确。证据推荐只代表文本相关，不代表来源已经支持该结论。
+`ST003`检查直接引语，`ST006`检查结论与指定位置的文本支持度。它们都不会凭空判断世界知识真假：只有与用户提供的可信材料对照后，才能指出确定错误或证据不足。证据推荐只代表文本相关，不代表来源已经支持该结论。
+
+## 速度优化
+
+- 多份PDF、PPTX、DOCX和字幕材料会并行解析；
+- 批量论文最多四路并行查询，同时保留输入顺序；
+- 重复的文本标准化和相似度基础数据会缓存；
+- 网络核验在后台执行，图形界面不会因批量任务失去响应。
 
 ## Windows免安装版本
 
@@ -201,7 +216,7 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-项目刻意不加入账号、云同步、聊天、闪卡和学习计划。当前重点是让来源检查可靠、便携并可操作。
+项目刻意不加入账号、云同步、聊天、闪卡和学习计划。核心始终是用可信证据约束AI生成内容，降低学习笔记与论文写作中的事实和引用幻觉。
 
 ## 隐私与课程材料
 
@@ -213,7 +228,7 @@ pytest -q
 
 ## English summary
 
-StudyLint is a local-first linter for study notes. It checks source references, pages, transcript timestamps, direct quotations, uncited claims, and conflicting definitions. It supports a desktop-style file picker, CLI, JSON, and self-contained HTML reports without requiring an AI API.
+StudyLint is a local-first guard against hallucinated study notes and paper citations. It checks source locations, quotation accuracy, claim-to-page support, risky uncited facts, conflicting definitions, and batches suspicious references for metadata and manual verification.
 
 ## License
 

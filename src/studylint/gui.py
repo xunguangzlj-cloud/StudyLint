@@ -6,7 +6,7 @@ import threading
 import webbrowser
 from pathlib import Path
 
-from studylint.parsers import discover_sources, load_source, parse_notes
+from studylint.parsers import discover_sources, load_sources, parse_notes
 from studylint.papers import (
     PaperLookupError,
     PaperVerification,
@@ -29,7 +29,7 @@ def check_to_html(notes_path: Path, source_directory: Path) -> tuple[Path, dict[
     if not source_paths:
         raise ValueError("资料文件夹中没有可支持的课程材料。")
     units = parse_notes(notes_path)
-    sources = [load_source(path) for path in source_paths]
+    sources = load_sources(source_paths)
     findings = lint(units, sources)
     output = notes_path.with_name(f"{notes_path.stem}-studylint-report.html")
     output.write_text(render_html(notes_path, findings), encoding="utf-8")
@@ -91,20 +91,22 @@ def main() -> None:
 
     notes_value = tk.StringVar()
     sources_value = tk.StringVar()
-    notes_status = tk.StringVar(value="选择笔记和课程资料文件夹，然后开始检查。")
-    paper_status = tk.StringVar(value="每行输入一篇论文，可一次核验多篇。")
+    notes_status = tk.StringVar(value="选择AI整理的笔记和可信课程资料，然后开始核查。")
+    paper_status = tk.StringVar(value="每行输入一篇AI引用的论文，可一次核验多篇。")
 
     outer = ttk.Frame(root, padding=(28, 22))
     outer.pack(fill="both", expand=True)
     ttk.Label(outer, text="StudyLint", font=("Segoe UI", 25, "bold")).pack(anchor="w")
-    ttk.Label(outer, text="核对学习笔记，也核实可疑论文").pack(anchor="w", pady=(0, 18))
+    ttk.Label(outer, text="打破学习中的AI幻觉：核查笔记事实与论文引用").pack(
+        anchor="w", pady=(0, 18)
+    )
 
     notebook = ttk.Notebook(outer)
     notebook.pack(fill="both", expand=True)
     notes_tab = ttk.Frame(notebook, padding=24)
     papers_tab = ttk.Frame(notebook, padding=24)
-    notebook.add(notes_tab, text="  笔记检查  ")
-    notebook.add(papers_tab, text="  论文核验  ")
+    notebook.add(notes_tab, text="  AI笔记幻觉核查  ")
+    notebook.add(papers_tab, text="  AI论文引用核查  ")
 
     def add_edit_menu(widget, text_widget: bool = False) -> None:
         menu = tk.Menu(widget, tearoff=False)
@@ -175,7 +177,7 @@ def main() -> None:
 
     ttk.Button(
         notes_tab,
-        text="开始检查并打开报告",
+        text="开始事实与引用核查",
         command=run_check,
         style="Accent.TButton",
     ).grid(row=2, column=0, columnspan=3, sticky="ew", pady=(24, 14))
@@ -184,14 +186,14 @@ def main() -> None:
     )
     ttk.Label(
         notes_tab,
-        text="课程材料仅在本机读取；证据候选仍需人工确认。",
+        text="确定错误、证据不足和无法自动核验会分开报告；课程材料仅在本机读取。",
         foreground="#656d76",
     ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(26, 0))
     notes_tab.columnconfigure(1, weight=1)
 
     ttk.Label(
         papers_tab,
-        text="粘贴DOI、论文标题或完整参考文献，每行一篇：",
+        text="粘贴AI生成或引用的DOI、论文标题、完整参考文献，每行一篇：",
     ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
     paper_input = scrolledtext.ScrolledText(
         papers_tab,

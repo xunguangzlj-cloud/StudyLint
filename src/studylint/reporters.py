@@ -16,13 +16,22 @@ def summary(findings: list[Finding]) -> dict[str, int]:
     }
 
 
+def finding_category(code: str) -> str:
+    if code in {"ST001", "ST002", "ST009"}:
+        return "引用完整性"
+    if code == "ST005":
+        return "内部一致性"
+    return "事实支持"
+
+
 def render_console(notes_path: Path, findings: list[Finding]) -> str:
     lines = [f"StudyLint: {notes_path}"]
     severity_names = {"error": "错误", "warning": "警告"}
     for finding in findings:
         lines.append(
             f"{severity_names.get(finding.severity, finding.severity):4} "
-            f"{finding.code} 第{finding.line}行：{finding.message}"
+            f"{finding.code} [{finding_category(finding.code)}] "
+            f"第{finding.line}行：{finding.message}"
         )
         if finding.action:
             lines.append(f"       建议：{finding.action}")
@@ -117,7 +126,7 @@ def _paper_verification_html(verification: PaperVerification, number: int) -> st
             if value
         )
         link = (
-            f'<a class="open" href="{html.escape(match.url, quote=True)}">查看论文页面</a>'
+            f'<a class="open" target="_blank" rel="noopener noreferrer" href="{html.escape(match.url, quote=True)}">查看论文页面</a>'
             if match.url
             else '<span class="unavailable">该记录没有公开链接</span>'
         )
@@ -131,7 +140,7 @@ def _paper_verification_html(verification: PaperVerification, number: int) -> st
             f"{link}</article>"
         )
     search_links = "".join(
-        f'<a class="search" href="{html.escape(link.url, quote=True)}">{html.escape(link.name)}</a>'
+        f'<a class="search" target="_blank" rel="noopener noreferrer" href="{html.escape(link.url, quote=True)}">{html.escape(link.name)}</a>'
         for link in verification.search_links
     )
     warnings = "".join(
@@ -155,6 +164,19 @@ def render_paper_html(verification: PaperVerification) -> str:
 
 def render_paper_batch_html(verifications: list[PaperVerification]) -> str:
     verified = sum(bool(item.matches) for item in verifications)
+    manual_urls = [
+        verification.search_links[0].url
+        for verification in verifications
+        if verification.search_links
+    ]
+    manual_urls_json = json.dumps(manual_urls, ensure_ascii=True)
+    batch_action = (
+        '<button class="open-all" type="button" onclick="openManualChecks()">'
+        f"一键在知网核查全部 {len(manual_urls)} 篇</button>"
+        '<span class="popup-tip">若浏览器拦截，请允许此报告打开多个标签页。</span>'
+        if manual_urls
+        else ""
+    )
     sections = "".join(
         _paper_verification_html(verification, number)
         for number, verification in enumerate(verifications, start=1)
@@ -178,14 +200,22 @@ def render_paper_batch_html(verifications: list[PaperVerification]) -> str:
     .paper h2 {{ margin:0 0 6px; font-size:20px; }} .facts {{ display:flex; gap:10px; flex-wrap:wrap; margin:14px 0; }}
     .facts span {{ padding:4px 9px; background:#f0f3f6; border-radius:6px; }} .open {{ display:inline-block; padding:9px 14px; color:#fff; background:var(--accent); border-radius:8px; text-decoration:none; font-weight:650; }}
     .manual {{ margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }} .search {{ display:inline-block; margin:8px 8px 0 0; padding:7px 11px; color:var(--accent); border:1px solid #a5b4fc; border-radius:7px; text-decoration:none; }}
+    .batch-actions {{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 24px; }} .open-all {{ border:0; padding:11px 16px; color:#fff; background:var(--accent); border-radius:8px; cursor:pointer; font:inherit; font-weight:700; }} .popup-tip {{ color:var(--muted); font-size:13px; }}
     .warnings {{ color:#9a6700; }} .notice {{ margin-top:28px; padding-top:18px; border-top:1px solid var(--border); font-size:14px; }}
   </style>
 </head>
 <body><main>
   <header><h1>StudyLint 批量论文核验</h1><div class="meta">自动查询Crossref与OpenAlex，并提供中文数据库人工检索入口。</div></header>
-  <section class="summary"><div>共 <strong>{len(verifications)}</strong> 篇</div><div>可靠候选 <strong>{verified}</strong> 篇</div><div>待人工核查 <strong>{len(verifications) - verified}</strong> 篇</div></section>
+  <section class="summary"><div>共 <strong>{len(verifications)}</strong> 篇</div><div>开放数据库有候选 <strong>{verified}</strong> 篇</div><div>需人工确认 <strong>{len(verifications)}</strong> 篇</div></section>
+  <div class="batch-actions">{batch_action}</div>
   {sections}
   <p class="notice">开放元数据记录可以证明文献元数据已登记，但不能单独证明论文内容真实可靠。知网等检索按钮仅打开对应搜索页，不代表StudyLint已经确认其收录。</p>
+  <script>
+    const manualCheckUrls = {manual_urls_json};
+    function openManualChecks() {{
+      manualCheckUrls.forEach((url) => window.open(url, "_blank", "noopener,noreferrer"));
+    }}
+  </script>
 </main></body></html>"""
 
 
@@ -239,6 +269,7 @@ def render_html(notes_path: Path, findings: list[Finding]) -> str:
             '<div class="finding-head">'
             f'<span class="badge">{severity_label}</span>'
             f'<code>{html.escape(finding.code)}</code>'
+            f'<span class="category">{finding_category(finding.code)}</span>'
             f'<span class="line">第 {finding.line} 行</span>'
             "</div>"
             f"<h2>{html.escape(finding.title or finding.code)}</h2>"
@@ -259,7 +290,7 @@ def render_html(notes_path: Path, findings: list[Finding]) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>StudyLint 检查报告</title>
+  <title>StudyLint AI学习幻觉核查报告</title>
   <style>
     :root {{ color-scheme: light; --bg:#f6f8fa; --card:#fff; --text:#1f2328; --muted:#656d76; --border:#d0d7de; --error:#cf222e; --warning:#9a6700; --accent:#4338ca; }}
     * {{ box-sizing:border-box; }}
@@ -277,6 +308,7 @@ def render_html(notes_path: Path, findings: list[Finding]) -> str:
     .badge {{ border-radius:999px; padding:2px 9px; color:#fff; background:var(--accent); font-size:13px; font-weight:700; }}
     .error .badge {{ background:var(--error); }} .warning .badge {{ background:var(--warning); }}
     .line {{ margin-left:auto; }} h2 {{ margin:12px 0 4px; font-size:21px; }}
+    .category {{ padding:1px 7px; border:1px solid var(--border); border-radius:999px; font-size:13px; }}
     .note {{ white-space:pre-wrap; overflow-wrap:anywhere; background:#f6f8fa; border:1px solid var(--border); padding:13px; border-radius:8px; }}
     .action {{ background:#eef2ff; padding:12px 14px; border-radius:8px; }}
     .suggestions ol {{ padding-left:22px; }} .suggestions li {{ margin:14px 0; }}
@@ -286,7 +318,7 @@ def render_html(notes_path: Path, findings: list[Finding]) -> str:
   </style>
 </head>
 <body><main>
-  <header><h1>StudyLint 检查报告</h1><div class="meta">笔记：{html.escape(str(notes_path))}</div></header>
+  <header><h1>AI学习笔记幻觉核查报告</h1><div class="meta">对照可信课程材料，检查引用、事实支持与内部一致性。<br>笔记：{html.escape(str(notes_path))}</div></header>
   <section class="summary">
     <div><strong>{counts['errors']}</strong>错误</div>
     <div><strong>{counts['warnings']}</strong>警告</div>
