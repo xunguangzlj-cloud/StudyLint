@@ -8,7 +8,7 @@
 
 **Description**
 
-> A deterministic linter for citation-backed study notes, with Crossref paper verification to catch fabricated references.
+> A deterministic linter for citation-backed study notes, with batch paper verification across Crossref and OpenAlex.
 
 **Topics**
 
@@ -22,8 +22,8 @@
 - [ ] 将 `assets/social-preview.png` 上传到仓库社交预览设置。
 - [ ] 运行 `pytest -q`。
 - [ ] 确认示例中不存在受版权保护或私人资料。
-- [ ] 创建标签 `v0.3.0`；发布工作流将构建Windows可执行文件并创建GitHub Release。
+- [ ] 创建标签 `v0.4.0`；发布工作流将构建Windows可执行文件并创建GitHub Release。
 
 ## 首次发布文案
 
-> I built StudyLint because AI-generated study notes and references often look correct without being traceable. Check notes against course materials locally, then verify suspicious papers by DOI or title through Crossref with direct links to the registered record. No account or AI API required.
+> I built StudyLint because AI-generated study notes and references often look correct without being traceable. Check notes against course materials locally, then batch-check suspicious papers through Crossref and OpenAlex, with direct fallback links for CNKI and other academic search engines. No account or AI API required.

@@ -55,9 +55,10 @@ def render_json(notes_path: Path, findings: list[Finding]) -> str:
 
 def paper_status(verification: PaperVerification) -> tuple[str, str]:
     if not verification.matches:
-        return "未检索到", "Crossref当前没有返回记录，但这不能证明论文不存在。"
+        return "开放数据库未匹配", "Crossref与OpenAlex当前没有可靠匹配，但这不能证明论文不存在。"
     if verification.query_type == "doi":
-        return "DOI已匹配", "Crossref中存在该DOI的元数据记录。"
+        source = verification.matches[0].source
+        return "DOI已匹配", f"{source}中存在该DOI的元数据记录。"
     best = verification.matches[0].similarity
     if best >= 85:
         return "高匹配候选", "标题与首条记录高度相似，请再核对作者、年份和期刊。"
@@ -65,32 +66,43 @@ def paper_status(verification: PaperVerification) -> tuple[str, str]:
 
 
 def render_paper_console(verification: PaperVerification) -> str:
-    status, explanation = paper_status(verification)
-    lines = [f"论文核验：{status}", explanation]
-    for index, match in enumerate(verification.matches, start=1):
-        metadata = " · ".join(
-            value
-            for value in (
-                ", ".join(match.authors),
-                match.year,
-                match.venue,
+    return render_paper_batch_console([verification])
+
+
+def render_paper_batch_console(verifications: list[PaperVerification]) -> str:
+    verified = sum(bool(item.matches) for item in verifications)
+    lines = [f"批量论文核验：{len(verifications)}篇，{verified}篇找到可靠候选"]
+    for number, verification in enumerate(verifications, start=1):
+        status, explanation = paper_status(verification)
+        lines.extend([f"\n[{number}] {verification.query}", f"状态：{status}", explanation])
+        for warning in verification.warnings:
+            lines.append(f"服务提示：{warning}")
+        for index, match in enumerate(verification.matches, start=1):
+            metadata = " · ".join(
+                value
+                for value in (
+                    ", ".join(match.authors),
+                    match.year,
+                    match.venue,
+                )
+                if value
             )
-            if value
-        )
-        lines.extend(
-            [
-                f"\n{index}. {match.title}",
-                f"   {metadata}" if metadata else "",
-                f"   DOI：{match.doi}" if match.doi else "",
-                f"   匹配度：{match.similarity}%",
-                f"   查看：{match.url}" if match.url else "",
-            ]
-        )
-    lines.append("\n说明：结果来自Crossref元数据；未检索到不等于论文一定不存在。")
+            lines.extend(
+                [
+                    f"  {index}. {match.title}",
+                    f"     {metadata}" if metadata else "",
+                    f"     来源：{match.source} · 匹配度：{match.similarity}%",
+                    f"     DOI：{match.doi}" if match.doi else "",
+                    f"     查看：{match.url}" if match.url else "",
+                ]
+            )
+        for link in verification.search_links:
+            lines.append(f"  {link.name}：{link.url}")
+    lines.append("\n说明：数据库未匹配不等于论文不存在；请使用知网等入口继续核查。")
     return "\n".join(line for line in lines if line)
 
 
-def render_paper_html(verification: PaperVerification) -> str:
+def _paper_verification_html(verification: PaperVerification, number: int) -> str:
     status, explanation = paper_status(verification)
     cards: list[str] = []
     for match in verification.matches:
@@ -113,15 +125,39 @@ def render_paper_html(verification: PaperVerification) -> str:
             '<article class="paper">'
             f"<h2>{html.escape(match.title)}</h2>"
             f'<p class="meta">{html.escape(metadata)}</p>'
-            f'<div class="facts"><span>匹配度 {match.similarity}%</span>'
+            f'<div class="facts"><span>{html.escape(match.source)}</span>'
+            f"<span>匹配度 {match.similarity}%</span>"
             f"<span>DOI：{html.escape(match.doi or '未提供')}</span></div>"
             f"{link}</article>"
         )
-    empty = (
-        '<article class="empty"><h2>当前没有检索结果</h2>'
-        "<p>请检查标题或DOI是否完整，也可以到学校图书馆、Google Scholar、知网等平台继续检索。</p></article>"
-        if not verification.matches
-        else ""
+    search_links = "".join(
+        f'<a class="search" href="{html.escape(link.url, quote=True)}">{html.escape(link.name)}</a>'
+        for link in verification.search_links
+    )
+    warnings = "".join(
+        f'<li>{html.escape(warning)}</li>' for warning in verification.warnings
+    )
+    warning_block = f'<ul class="warnings">{warnings}</ul>' if warnings else ""
+    return (
+        '<section class="verification">'
+        f'<div class="query-number">第 {number} 篇</div>'
+        f"<h2>{html.escape(verification.query)}</h2>"
+        f'<div class="status"><strong>{html.escape(status)}</strong>{html.escape(explanation)}</div>'
+        f"{warning_block}{''.join(cards)}"
+        '<div class="manual"><strong>继续人工核查</strong>'
+        f"<div>{search_links}</div></div></section>"
+    )
+
+
+def render_paper_html(verification: PaperVerification) -> str:
+    return render_paper_batch_html([verification])
+
+
+def render_paper_batch_html(verifications: list[PaperVerification]) -> str:
+    verified = sum(bool(item.matches) for item in verifications)
+    sections = "".join(
+        _paper_verification_html(verification, number)
+        for number, verification in enumerate(verifications, start=1)
     )
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -132,19 +168,24 @@ def render_paper_html(verification: PaperVerification) -> str:
   <style>
     :root {{ --bg:#f6f8fa; --card:#fff; --text:#1f2328; --muted:#656d76; --border:#d0d7de; --accent:#4338ca; }}
     * {{ box-sizing:border-box; }} body {{ margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui,"Microsoft YaHei",sans-serif; }}
-    main {{ width:min(900px,calc(100% - 32px)); margin:40px auto 80px; }} h1 {{ margin-bottom:4px; }}
-    .query,.meta,.notice {{ color:var(--muted); }} .status {{ margin:24px 0; padding:18px 20px; background:#eef2ff; border-left:5px solid var(--accent); border-radius:10px; }}
-    .status strong {{ display:block; color:var(--accent); font-size:22px; }} .paper,.empty {{ margin:16px 0; padding:22px; background:var(--card); border:1px solid var(--border); border-radius:12px; }}
+    main {{ width:min(960px,calc(100% - 32px)); margin:40px auto 80px; }} h1 {{ margin-bottom:4px; }}
+    .meta,.notice {{ color:var(--muted); }} .summary {{ display:flex; gap:12px; margin:22px 0 30px; }}
+    .summary div {{ padding:12px 18px; background:var(--card); border:1px solid var(--border); border-radius:10px; }}
+    .verification {{ margin:24px 0; padding:24px; background:var(--card); border:1px solid var(--border); border-radius:14px; }}
+    .verification>h2 {{ margin:4px 0 14px; font-size:22px; }} .query-number {{ color:var(--accent); font-weight:700; }}
+    .status {{ margin:14px 0; padding:14px 16px; background:#eef2ff; border-left:5px solid var(--accent); border-radius:9px; }}
+    .status strong {{ display:block; color:var(--accent); font-size:18px; }} .paper {{ margin:14px 0; padding:18px; background:#fbfcfe; border:1px solid var(--border); border-radius:10px; }}
     .paper h2 {{ margin:0 0 6px; font-size:20px; }} .facts {{ display:flex; gap:10px; flex-wrap:wrap; margin:14px 0; }}
     .facts span {{ padding:4px 9px; background:#f0f3f6; border-radius:6px; }} .open {{ display:inline-block; padding:9px 14px; color:#fff; background:var(--accent); border-radius:8px; text-decoration:none; font-weight:650; }}
-    .notice {{ margin-top:28px; padding-top:18px; border-top:1px solid var(--border); font-size:14px; }}
+    .manual {{ margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }} .search {{ display:inline-block; margin:8px 8px 0 0; padding:7px 11px; color:var(--accent); border:1px solid #a5b4fc; border-radius:7px; text-decoration:none; }}
+    .warnings {{ color:#9a6700; }} .notice {{ margin-top:28px; padding-top:18px; border-top:1px solid var(--border); font-size:14px; }}
   </style>
 </head>
 <body><main>
-  <header><h1>StudyLint 论文核验</h1><div class="query">查询：{html.escape(verification.query)}</div></header>
-  <section class="status"><strong>{html.escape(status)}</strong>{html.escape(explanation)}</section>
-  {empty}{''.join(cards)}
-  <p class="notice">数据来源：Crossref开放元数据。数据库记录可以证明元数据已登记，但不能单独证明论文内容真实可靠；未检索到也不等于论文一定不存在。</p>
+  <header><h1>StudyLint 批量论文核验</h1><div class="meta">自动查询Crossref与OpenAlex，并提供中文数据库人工检索入口。</div></header>
+  <section class="summary"><div>共 <strong>{len(verifications)}</strong> 篇</div><div>可靠候选 <strong>{verified}</strong> 篇</div><div>待人工核查 <strong>{len(verifications) - verified}</strong> 篇</div></section>
+  {sections}
+  <p class="notice">开放元数据记录可以证明文献元数据已登记，但不能单独证明论文内容真实可靠。知网等检索按钮仅打开对应搜索页，不代表StudyLint已经确认其收录。</p>
 </main></body></html>"""
 
 

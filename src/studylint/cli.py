@@ -6,13 +6,13 @@ import webbrowser
 from pathlib import Path
 
 from studylint.parsers import discover_sources, load_source, parse_notes
-from studylint.papers import PaperLookupError, verify_paper
+from studylint.papers import PaperLookupError, parse_queries, read_query_file, verify_papers
 from studylint.reporters import (
     render_console,
     render_html,
     render_json,
-    render_paper_console,
-    render_paper_html,
+    render_paper_batch_console,
+    render_paper_batch_html,
 )
 from studylint.rules import lint
 
@@ -52,7 +52,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers.add_parser("gui", help="打开本地图形界面。")
     paper = subparsers.add_parser("paper", help="按DOI或题名核实论文记录。")
-    paper.add_argument("query", help="论文DOI、标题或完整参考文献。")
+    paper.add_argument("query", nargs="?", help="论文DOI、标题或完整参考文献。")
+    paper.add_argument(
+        "--file",
+        type=Path,
+        help="批量论文清单，每行一个DOI、标题或完整参考文献。",
+    )
     paper.add_argument(
         "--format",
         choices=("console", "html"),
@@ -129,7 +134,11 @@ def run_check(args: argparse.Namespace) -> int:
 
 def run_paper(args: argparse.Namespace) -> int:
     try:
-        verification = verify_paper(args.query, email=args.email)
+        queries = parse_queries(args.query or "")
+        if args.file:
+            queries.extend(read_query_file(args.file))
+        queries = list(dict.fromkeys(queries))
+        verifications = verify_papers(queries, email=args.email)
     except (PaperLookupError, ValueError) as error:
         print(f"论文核验失败：{error}", file=sys.stderr)
         return 2
@@ -137,7 +146,7 @@ def run_paper(args: argparse.Namespace) -> int:
     if args.format == "html":
         output = args.output or Path("studylint-paper-report.html")
         try:
-            output.write_text(render_paper_html(verification), encoding="utf-8")
+            output.write_text(render_paper_batch_html(verifications), encoding="utf-8")
         except OSError as error:
             print(f"无法写入核验结果：{error}", file=sys.stderr)
             return 2
@@ -148,8 +157,8 @@ def run_paper(args: argparse.Namespace) -> int:
         if args.output or args.open:
             print("--output和--open只能与HTML格式一起使用。", file=sys.stderr)
             return 2
-        print(render_paper_console(verification))
-    return 0 if verification.matches else 1
+        print(render_paper_batch_console(verifications))
+    return 0 if all(item.matches for item in verifications) else 1
 
 
 def main(argv: list[str] | None = None) -> None:

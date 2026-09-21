@@ -9,7 +9,7 @@
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-4338CA">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-2DD4BF">
-  <img alt="Version 0.3" src="https://img.shields.io/badge/Version-0.3-F59E0B">
+  <img alt="Version 0.4" src="https://img.shields.io/badge/Version-0.4-F59E0B">
 </p>
 
 StudyLint 是一个本地运行的课程笔记检查工具。把笔记和课程材料交给它，它会检查失效引用、不匹配的原文、缺少来源的结论和冲突定义，并生成可点击来源的中文报告。
@@ -29,7 +29,7 @@ StudyLint 是一个本地运行的课程笔记检查工具。把笔记和课程�
 - **推荐可能证据**：使用本地文本匹配提供最多3条候选来源，由用户最终确认。
 - **发现冲突定义**：提示同一术语在笔记中出现差异较大的定义。
 - **离线HTML报告**：显示问题原因、修改建议、笔记原文和可点击来源。
-- **论文存在性核验**：通过Crossref按DOI精确查询，或按题名检索候选论文并给出直达链接。
+- **批量论文核验**：通过Crossref与OpenAlex核验DOI或题名，过滤低相关结果，并提供知网等人工检索入口。
 - **图形界面与CLI**：普通学生使用文件选择界面，开发者可使用终端和JSON。
 
 ## 最快使用方法：图形界面
@@ -54,7 +54,7 @@ studylint gui
 3. 点击“开始检查并打开报告”；
 4. 在浏览器中查看错误、警告和证据候选。
 
-核实AI生成的论文时，在界面下方粘贴DOI、论文标题或完整参考文献，然后点击“核实并查看”。DOI核验最准确；标题检索会列出候选记录，仍需核对作者、年份和期刊。
+核实AI生成的论文时，切换到“论文核验”标签页，每行粘贴一个DOI、论文标题或完整参考文献，然后点击“开始批量核验”。也可以导入TXT或CSV清单。输入区支持右键剪切、复制、粘贴和全选。DOI核验最准确；题名检索仍需核对作者、年份和期刊。
 
 所有材料只在本机处理。生成的报告保存在笔记旁边：
 
@@ -109,7 +109,13 @@ studylint paper "10.1038/nature12373" --format html --open
 studylint paper "Nanometre-scale thermometry in a living cell" --format html --open
 ```
 
-结果会显示标题、作者、年份、期刊、匹配度和DOI链接。数据来自Crossref开放元数据，需要联网。Crossref未检索到记录不等于论文一定不存在，因为部分论文可能登记在其他数据库，或输入信息不完整。
+批量核验时准备一个每行一篇的`papers.txt`：
+
+```powershell
+studylint paper --file papers.txt --format html --open
+```
+
+结果会显示标题、作者、年份、期刊、匹配度和论文链接。自动查询Crossref与OpenAlex开放元数据；低相关结果会被过滤。每篇结果还提供知网、Google Scholar和百度学术搜索链接。开放数据库未匹配不等于论文一定不存在，因为部分中文论文可能只被知网等数据库收录，或输入信息不完整。
 
 退出码：
 
@@ -200,7 +206,7 @@ pytest -q
 ## 隐私与课程材料
 
 - 文件默认只在本机读取和处理；
-- 使用论文核验时，输入的DOI、标题或参考文献会发送到Crossref查询；
+- 使用论文核验时，输入的DOI、标题或参考文献会发送到Crossref与OpenAlex查询；只有点击人工检索按钮后，浏览器才会访问知网、Google Scholar或百度学术；
 - 不要向公开仓库提交受版权保护的课件、私人课堂转写或个人信息；
 - 示例课程完全虚构；
 - HTML报告可能包含笔记与来源片段，不应随意公开分享。

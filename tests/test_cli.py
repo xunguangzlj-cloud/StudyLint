@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from studylint.cli import build_parser, run_check, run_paper
-from studylint.gui import check_to_html, paper_to_html
+from studylint.gui import check_to_html, paper_to_html, papers_to_html
 from studylint.models import Finding
 from studylint.papers import PaperMatch, PaperVerification
 from studylint.reporters import render_html
@@ -112,7 +112,10 @@ def sample_verification() -> PaperVerification:
 
 def test_paper_cli_html(monkeypatch, tmp_path: Path) -> None:
     output = tmp_path / "paper.html"
-    monkeypatch.setattr("studylint.cli.verify_paper", lambda query, email="": sample_verification())
+    monkeypatch.setattr(
+        "studylint.cli.verify_papers",
+        lambda queries, email="": [sample_verification()],
+    )
     args = build_parser().parse_args(
         ["paper", "测试论文", "--format", "html", "--output", str(output)]
     )
@@ -128,3 +131,32 @@ def test_gui_paper_helper(tmp_path: Path) -> None:
 
     assert output.is_file()
     assert verification.matches[0].doi == "10.1234/example"
+
+
+def test_paper_cli_batch_file(monkeypatch, tmp_path: Path) -> None:
+    source = tmp_path / "papers.txt"
+    output = tmp_path / "batch.html"
+    source.write_text("第一篇\n第二篇\n", encoding="utf-8")
+
+    def fake_lookup(queries, email=""):
+        assert queries == ["第一篇", "第二篇"]
+        return [sample_verification(), sample_verification()]
+
+    monkeypatch.setattr("studylint.cli.verify_papers", fake_lookup)
+    args = build_parser().parse_args(
+        ["paper", "--file", str(source), "--format", "html", "--output", str(output)]
+    )
+
+    assert run_paper(args) == 0
+    assert "共 <strong>2</strong> 篇" in output.read_text(encoding="utf-8")
+
+
+def test_gui_batch_paper_helper(tmp_path: Path) -> None:
+    output, verifications = papers_to_html(
+        ["第一篇", "第二篇"],
+        tmp_path,
+        lookup=lambda queries: [sample_verification(), sample_verification()],
+    )
+
+    assert output.is_file()
+    assert len(verifications) == 2
