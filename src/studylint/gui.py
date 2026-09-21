@@ -4,7 +4,8 @@ import webbrowser
 from pathlib import Path
 
 from studylint.parsers import discover_sources, load_source, parse_notes
-from studylint.reporters import render_html, summary
+from studylint.papers import PaperLookupError, PaperVerification, verify_paper
+from studylint.reporters import render_html, render_paper_html, summary
 from studylint.rules import lint
 
 
@@ -20,17 +21,29 @@ def check_to_html(notes_path: Path, source_directory: Path) -> tuple[Path, dict[
     return output, summary(findings)
 
 
+def paper_to_html(
+    query: str,
+    output_directory: Path,
+    lookup=verify_paper,
+) -> tuple[Path, PaperVerification]:
+    verification = lookup(query)
+    output = output_directory / "studylint-paper-report.html"
+    output.write_text(render_paper_html(verification), encoding="utf-8")
+    return output, verification
+
+
 def main() -> None:
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
 
     root = tk.Tk()
     root.title("StudyLint")
-    root.geometry("700x360")
-    root.minsize(620, 330)
+    root.geometry("700x500")
+    root.minsize(620, 470)
 
     notes_value = tk.StringVar()
     sources_value = tk.StringVar()
+    paper_value = tk.StringVar()
     status_value = tk.StringVar(value="选择笔记和课程资料文件夹，然后开始检查。")
 
     frame = ttk.Frame(root, padding=28)
@@ -97,11 +110,47 @@ def main() -> None:
     ttk.Label(frame, textvariable=status_value, foreground="#4338ca").grid(
         row=5, column=0, columnspan=3, sticky="w"
     )
+
+    ttk.Separator(frame).grid(
+        row=6, column=0, columnspan=3, sticky="ew", pady=(24, 18)
+    )
+    ttk.Label(frame, text="核实论文", font=("Segoe UI", 13, "bold")).grid(
+        row=7, column=0, sticky="w"
+    )
+    ttk.Entry(frame, textvariable=paper_value).grid(
+        row=7, column=1, sticky="ew", padx=10
+    )
+
+    def run_paper_check() -> None:
+        query = paper_value.get().strip()
+        if not query:
+            messagebox.showerror("无法核实", "请输入论文DOI、标题或完整参考文献。")
+            return
+        status_value.set("正在查询Crossref，请稍候……")
+        root.update_idletasks()
+        notes_path = Path(notes_value.get())
+        output_directory = notes_path.parent if notes_path.is_file() else Path.cwd()
+        try:
+            output, verification = paper_to_html(query, output_directory)
+        except (OSError, PaperLookupError, ValueError) as error:
+            status_value.set("论文核验失败。")
+            messagebox.showerror("论文核验失败", str(error))
+            return
+        if verification.matches:
+            status_value.set(f"找到{len(verification.matches)}条记录，请核对详细信息。")
+        else:
+            status_value.set("当前未检索到记录；这不代表论文一定不存在。")
+        webbrowser.open(output.resolve().as_uri())
+
+    ttk.Button(frame, text="核实并查看", command=run_paper_check).grid(row=7, column=2)
+    ttk.Label(frame, text="输入DOI最准确，也可输入标题或整条参考文献。", foreground="#656d76").grid(
+        row=8, column=1, columnspan=2, sticky="w", padx=10, pady=(6, 0)
+    )
     ttk.Label(
         frame,
-        text="所有文件仅在本机处理。证据候选需要人工确认。",
+        text="笔记检查仅在本机处理；论文核验会将查询文字发送到Crossref。",
         foreground="#656d76",
-    ).grid(row=6, column=0, columnspan=3, sticky="w", pady=(24, 0))
+    ).grid(row=9, column=0, columnspan=3, sticky="w", pady=(24, 0))
 
     frame.columnconfigure(1, weight=1)
     root.mainloop()

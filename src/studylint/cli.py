@@ -6,7 +6,14 @@ import webbrowser
 from pathlib import Path
 
 from studylint.parsers import discover_sources, load_source, parse_notes
-from studylint.reporters import render_console, render_html, render_json
+from studylint.papers import PaperLookupError, verify_paper
+from studylint.reporters import (
+    render_console,
+    render_html,
+    render_json,
+    render_paper_console,
+    render_paper_html,
+)
 from studylint.rules import lint
 
 
@@ -44,6 +51,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="生成后在默认浏览器中打开HTML报告。",
     )
     subparsers.add_parser("gui", help="打开本地图形界面。")
+    paper = subparsers.add_parser("paper", help="按DOI或题名核实论文记录。")
+    paper.add_argument("query", help="论文DOI、标题或完整参考文献。")
+    paper.add_argument(
+        "--format",
+        choices=("console", "html"),
+        default="console",
+        help="结果格式。",
+    )
+    paper.add_argument("--output", "-o", type=Path, help="HTML结果输出路径。")
+    paper.add_argument("--open", action="store_true", help="在浏览器中打开HTML结果。")
+    paper.add_argument(
+        "--email",
+        default="",
+        help="可选联系邮箱，用于Crossref礼貌请求池。",
+    )
     return parser
 
 
@@ -105,6 +127,31 @@ def run_check(args: argparse.Namespace) -> int:
     return 1 if any(finding.severity == "error" for finding in findings) else 0
 
 
+def run_paper(args: argparse.Namespace) -> int:
+    try:
+        verification = verify_paper(args.query, email=args.email)
+    except (PaperLookupError, ValueError) as error:
+        print(f"论文核验失败：{error}", file=sys.stderr)
+        return 2
+
+    if args.format == "html":
+        output = args.output or Path("studylint-paper-report.html")
+        try:
+            output.write_text(render_paper_html(verification), encoding="utf-8")
+        except OSError as error:
+            print(f"无法写入核验结果：{error}", file=sys.stderr)
+            return 2
+        print(f"论文核验结果已生成：{output}")
+        if args.open:
+            webbrowser.open(output.resolve().as_uri())
+    else:
+        if args.output or args.open:
+            print("--output和--open只能与HTML格式一起使用。", file=sys.stderr)
+            return 2
+        print(render_paper_console(verification))
+    return 0 if verification.matches else 1
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -114,3 +161,5 @@ def main(argv: list[str] | None = None) -> None:
         from studylint.gui import main as gui_main
 
         gui_main()
+    if args.command == "paper":
+        raise SystemExit(run_paper(args))

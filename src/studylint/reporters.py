@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from studylint.models import Finding
+from studylint.papers import PaperVerification
 
 
 def summary(findings: list[Finding]) -> dict[str, int]:
@@ -50,6 +51,101 @@ def render_json(notes_path: Path, findings: list[Finding]) -> str:
         "findings": [finding.to_dict() for finding in findings],
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def paper_status(verification: PaperVerification) -> tuple[str, str]:
+    if not verification.matches:
+        return "未检索到", "Crossref当前没有返回记录，但这不能证明论文不存在。"
+    if verification.query_type == "doi":
+        return "DOI已匹配", "Crossref中存在该DOI的元数据记录。"
+    best = verification.matches[0].similarity
+    if best >= 85:
+        return "高匹配候选", "标题与首条记录高度相似，请再核对作者、年份和期刊。"
+    return "可能候选", "找到了相关记录，但标题匹配度有限，请勿直接视为核验通过。"
+
+
+def render_paper_console(verification: PaperVerification) -> str:
+    status, explanation = paper_status(verification)
+    lines = [f"论文核验：{status}", explanation]
+    for index, match in enumerate(verification.matches, start=1):
+        metadata = " · ".join(
+            value
+            for value in (
+                ", ".join(match.authors),
+                match.year,
+                match.venue,
+            )
+            if value
+        )
+        lines.extend(
+            [
+                f"\n{index}. {match.title}",
+                f"   {metadata}" if metadata else "",
+                f"   DOI：{match.doi}" if match.doi else "",
+                f"   匹配度：{match.similarity}%",
+                f"   查看：{match.url}" if match.url else "",
+            ]
+        )
+    lines.append("\n说明：结果来自Crossref元数据；未检索到不等于论文一定不存在。")
+    return "\n".join(line for line in lines if line)
+
+
+def render_paper_html(verification: PaperVerification) -> str:
+    status, explanation = paper_status(verification)
+    cards: list[str] = []
+    for match in verification.matches:
+        metadata = " · ".join(
+            value
+            for value in (
+                ", ".join(match.authors),
+                match.year,
+                match.venue,
+                match.publisher,
+            )
+            if value
+        )
+        link = (
+            f'<a class="open" href="{html.escape(match.url, quote=True)}">查看论文页面</a>'
+            if match.url
+            else '<span class="unavailable">该记录没有公开链接</span>'
+        )
+        cards.append(
+            '<article class="paper">'
+            f"<h2>{html.escape(match.title)}</h2>"
+            f'<p class="meta">{html.escape(metadata)}</p>'
+            f'<div class="facts"><span>匹配度 {match.similarity}%</span>'
+            f"<span>DOI：{html.escape(match.doi or '未提供')}</span></div>"
+            f"{link}</article>"
+        )
+    empty = (
+        '<article class="empty"><h2>当前没有检索结果</h2>'
+        "<p>请检查标题或DOI是否完整，也可以到学校图书馆、Google Scholar、知网等平台继续检索。</p></article>"
+        if not verification.matches
+        else ""
+    )
+    return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>StudyLint 论文核验</title>
+  <style>
+    :root {{ --bg:#f6f8fa; --card:#fff; --text:#1f2328; --muted:#656d76; --border:#d0d7de; --accent:#4338ca; }}
+    * {{ box-sizing:border-box; }} body {{ margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui,"Microsoft YaHei",sans-serif; }}
+    main {{ width:min(900px,calc(100% - 32px)); margin:40px auto 80px; }} h1 {{ margin-bottom:4px; }}
+    .query,.meta,.notice {{ color:var(--muted); }} .status {{ margin:24px 0; padding:18px 20px; background:#eef2ff; border-left:5px solid var(--accent); border-radius:10px; }}
+    .status strong {{ display:block; color:var(--accent); font-size:22px; }} .paper,.empty {{ margin:16px 0; padding:22px; background:var(--card); border:1px solid var(--border); border-radius:12px; }}
+    .paper h2 {{ margin:0 0 6px; font-size:20px; }} .facts {{ display:flex; gap:10px; flex-wrap:wrap; margin:14px 0; }}
+    .facts span {{ padding:4px 9px; background:#f0f3f6; border-radius:6px; }} .open {{ display:inline-block; padding:9px 14px; color:#fff; background:var(--accent); border-radius:8px; text-decoration:none; font-weight:650; }}
+    .notice {{ margin-top:28px; padding-top:18px; border-top:1px solid var(--border); font-size:14px; }}
+  </style>
+</head>
+<body><main>
+  <header><h1>StudyLint 论文核验</h1><div class="query">查询：{html.escape(verification.query)}</div></header>
+  <section class="status"><strong>{html.escape(status)}</strong>{html.escape(explanation)}</section>
+  {empty}{''.join(cards)}
+  <p class="notice">数据来源：Crossref开放元数据。数据库记录可以证明元数据已登记，但不能单独证明论文内容真实可靠；未检索到也不等于论文一定不存在。</p>
+</main></body></html>"""
 
 
 def _format_time(seconds: int) -> str:
