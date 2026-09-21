@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">StudyLint logo</title>
+  <desc id="desc">一张带引用括号和校验勾的文档</desc>
+  <path fill="#4338CA" d="M55 28h96l50 50v142a20 20 0 0 1-20 20H55a20 20 0 0 1-20-20V48a20 20 0 0 1 20-20Z"/>
+  <path fill="#A5B4FC" d="M151 28v38a12 12 0 0 0 12 12h38Z"/>
+  <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="15" d="M90 97H72v62h18m76-62h18v62h-18"/>
+  <path fill="none" stroke="#2DD4BF" stroke-linecap="round" stroke-linejoin="round" stroke-width="17" d="m81 185 25 24 63-70"/>
+</svg>
+

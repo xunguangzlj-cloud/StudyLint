@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">StudyLint social preview</title>
+  <desc id="desc">StudyLint——让每条学习笔记都能追溯来源</desc>
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0v32" fill="none" stroke="#30363D" stroke-width="1" opacity=".42"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="640" rx="28" fill="#0D1117"/>
+  <rect width="1280" height="640" rx="28" fill="url(#grid)"/>
+  <g transform="translate(110 155) scale(1.28)">
+    <path fill="#4338CA" d="M55 28h96l50 50v142a20 20 0 0 1-20 20H55a20 20 0 0 1-20-20V48a20 20 0 0 1 20-20Z"/>
+    <path fill="#A5B4FC" d="M151 28v38a12 12 0 0 0 12 12h38Z"/>
+    <path fill="none" stroke="#FFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="15" d="M90 97H72v62h18m76-62h18v62h-18"/>
+    <path fill="none" stroke="#2DD4BF" stroke-linecap="round" stroke-linejoin="round" stroke-width="17" d="m81 185 25 24 63-70"/>
+  </g>
+  <text x="470" y="275" fill="#F0F6FC" font-family="Inter,Segoe UI,sans-serif" font-size="92" font-weight="700">StudyLint</text>
+  <text x="474" y="352" fill="#8B949E" font-family="Inter,Segoe UI,sans-serif" font-size="32">Trace every claim back to its source.</text>
+  <g transform="translate(474 402)" font-family="Consolas,monospace" font-size="22">
+    <rect width="650" height="74" rx="12" fill="#161B22" stroke="#30363D"/>
+    <text x="24" y="45" fill="#2DD4BF">$ studylint check notes.md -s slides.pdf</text>
+  </g>
+</svg>
+

@@ -1,0 +1,36 @@
+name: Bug report
+description: 报告可复现的问题
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: 请勿上传受版权保护的课件、私人转写或包含个人信息的材料。
+  - type: input
+    id: version
+    attributes:
+      label: StudyLint版本
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 最小复现步骤
+      description: 请使用自制的最小示例。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果与实际结果
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 运行环境
+      placeholder: Windows 11, Python 3.12
+    validations:
+      required: true
+
