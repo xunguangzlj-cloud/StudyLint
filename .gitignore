@@ -4,6 +4,6 @@ __pycache__/
 .venv/
 dist/
 build/
+releases/
 *.egg-info/
 report.json
-

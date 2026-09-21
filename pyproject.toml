@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "studylint"
-version = "0.1.0"
-description = "A deterministic linter for citation-backed study notes."
+version = "0.2.0"
+description = "A local-first linter that traces study notes back to course sources."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
@@ -24,14 +24,17 @@ classifiers = [
 dependencies = [
   "PyMuPDF>=1.24",
   "python-pptx>=1.0",
+  "python-docx>=1.1",
   "rapidfuzz>=3.9",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+build = ["pyinstaller>=6.0"]
 
 [project.scripts]
 studylint = "studylint.cli:main"
+studylint-gui = "studylint.gui:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/studylint"]

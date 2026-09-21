@@ -35,6 +35,27 @@ class NoteUnit:
     line: int
     text: str
     citations: tuple[Citation, ...]
+    ignored_codes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class EvidenceSuggestion:
+    source_name: str
+    source_path: str
+    locator_type: str
+    locator_value: int
+    excerpt: str
+    score: int
+
+    def to_dict(self) -> dict[str, str | int]:
+        return {
+            "source_name": self.source_name,
+            "source_path": self.source_path,
+            "locator_type": self.locator_type,
+            "locator_value": self.locator_value,
+            "excerpt": self.excerpt,
+            "score": self.score,
+        }
 
 
 @dataclass(frozen=True)
@@ -43,12 +64,19 @@ class Finding:
     severity: str
     line: int
     message: str
+    title: str = ""
+    action: str = ""
+    note_text: str = ""
+    suggestions: tuple[EvidenceSuggestion, ...] = ()
 
-    def to_dict(self) -> dict[str, str | int]:
+    def to_dict(self) -> dict[str, object]:
         return {
             "code": self.code,
             "severity": self.severity,
             "line": self.line,
             "message": self.message,
+            "title": self.title,
+            "action": self.action,
+            "note_text": self.note_text,
+            "suggestions": [suggestion.to_dict() for suggestion in self.suggestions],
         }
-

@@ -49,3 +49,27 @@ def test_conflicting_definitions(tmp_path: Path) -> None:
     )
     assert codes == ["ST005"]
 
+
+def test_ignore_next_rule(tmp_path: Path) -> None:
+    codes = _lint(
+        tmp_path,
+        "<!-- studylint-ignore ST004 -->\n这是一条明确选择忽略引用检查的较长笔记。",
+        "课程材料。",
+    )
+    assert codes == []
+
+
+def test_uncited_claim_has_evidence_suggestion(tmp_path: Path) -> None:
+    notes_path = tmp_path / "notes.md"
+    source_path = tmp_path / "slides.md"
+    notes_path.write_text("信息能够减少决策过程中的不确定性。", encoding="utf-8")
+    source_path.write_text(
+        "<!-- page: 4 -->\n信息能够减少决策过程中的不确定性。",
+        encoding="utf-8",
+    )
+
+    findings = lint(parse_notes(notes_path), [load_source(source_path)])
+    assert findings[0].code == "ST004"
+    assert findings[0].suggestions[0].source_name == "slides.md"
+    assert findings[0].suggestions[0].locator_value == 4
+    assert findings[0].suggestions[0].score >= 90

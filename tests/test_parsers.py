@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from studylint.parsers import extract_citations, load_source, parse_time
+from studylint.parsers import (
+    discover_sources,
+    extract_citations,
+    load_source,
+    parse_notes,
+    parse_time,
+)
 
 
 def test_parse_time() -> None:
@@ -43,10 +49,10 @@ def test_srt_segments(tmp_path: Path) -> None:
 
 
 def test_pdf_pages(tmp_path: Path) -> None:
-    import fitz
+    import pymupdf
 
     source = tmp_path / "slides.pdf"
-    document = fitz.open()
+    document = pymupdf.open()
     page = document.new_page()
     page.insert_text((72, 72), "Page one evidence")
     document.save(source)
@@ -71,3 +77,29 @@ def test_pptx_slides(tmp_path: Path) -> None:
     assert len(parsed.spans) == 1
     assert parsed.spans[0].locator_value == 1
     assert "Slide evidence" in parsed.spans[0].text
+
+
+def test_docx_notes(tmp_path: Path) -> None:
+    from docx import Document
+
+    notes = tmp_path / "notes.docx"
+    document = Document()
+    document.add_paragraph("信息能够减少不确定性。[slides.pdf#page=2]")
+    document.save(notes)
+
+    units = parse_notes(notes)
+    assert len(units) == 1
+    assert units[0].citations[0].locator_value == 2
+
+
+def test_discover_sources_excludes_notes(tmp_path: Path) -> None:
+    notes = tmp_path / "notes.md"
+    notes.write_text("笔记", encoding="utf-8")
+    (tmp_path / "slides.pdf").write_bytes(b"not parsed in this test")
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "lecture.srt").write_text("", encoding="utf-8")
+    (nested / "ignored.csv").write_text("", encoding="utf-8")
+
+    found = discover_sources(tmp_path, exclude=notes)
+    assert [path.name for path in found] == ["lecture.srt", "slides.pdf"]
