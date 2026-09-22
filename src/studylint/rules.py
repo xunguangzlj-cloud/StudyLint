@@ -21,11 +21,6 @@ QUOTE_PATTERN = re.compile(r"“([^”]{4,})”|\"([^\"]{4,})\"")
 DEFINITION_PATTERN = re.compile(
     r"^(?:[-*+]\s*)?(?:\*\*)?([^:：]{2,40}?)(?:\*\*)?\s*[:：]\s*(.+)$"
 )
-HIGH_RISK_FACT_PATTERN = re.compile(
-    r"\d|[%％]|表明|证明|导致|提高|降低|增加|减少|首次|唯一|最高|最低|必然|一定|超过|占比|率为"
-)
-
-
 @lru_cache(maxsize=2048)
 def _normalize(text: str) -> str:
     return re.sub(r"[^\w\u4e00-\u9fff]+", "", text).casefold()
@@ -224,12 +219,6 @@ def _quote_findings(unit: NoteUnit, spans: list[SourceSpan]) -> list[Finding]:
     return findings
 
 
-def _is_claim(text: str) -> bool:
-    without_citations = CITATION_PATTERN.sub("", text)
-    without_markdown = re.sub(r"^[>*+-]\s*", "", without_citations).strip()
-    return len(re.sub(r"\s+", "", without_markdown)) >= 12
-
-
 def _claim_text(text: str) -> str:
     without_citations = CITATION_PATTERN.sub("", text)
     return re.sub(
@@ -259,33 +248,6 @@ def _citation_support_finding(
         action="回到所标页码或时间点核对；若引用位置写错，请更正，若是概括请补充能对应原文的表述。",
         note_text=unit.text,
         suggestions=_suggest_evidence(claim, sources),
-    )
-
-
-def _missing_citation_finding(
-    unit: NoteUnit, sources: list[SourceDocument]
-) -> Finding | None:
-    if unit.citations or not _is_claim(unit.text):
-        return None
-    suggestions = _suggest_evidence(unit.text, sources)
-    high_risk = bool(HIGH_RISK_FACT_PATTERN.search(_claim_text(unit.text)))
-    return Finding(
-        "ST007" if high_risk else "ST004",
-        "warning",
-        unit.line,
-        (
-            "这条包含数字、因果或绝对化表述的结论没有来源引用。"
-            if high_risk
-            else "这条较长的笔记没有来源引用。"
-        ),
-        title="高风险事实缺少来源" if high_risk else "结论缺少来源",
-        action=(
-            "核对下方可能相关的来源；确认后补充页码或时间点引用。"
-            if suggestions
-            else "暂未找到明显相关来源，请人工搜索课程材料或确认这是否属于个人总结。"
-        ),
-        note_text=unit.text,
-        suggestions=suggestions,
     )
 
 
@@ -341,9 +303,5 @@ def lint(units: list[NoteUnit], sources: list[SourceDocument]) -> list[Finding]:
         support = _citation_support_finding(unit, spans, sources)
         if support and support.code not in unit.ignored_codes:
             findings.append(support)
-        missing = _missing_citation_finding(unit, sources)
-        if missing:
-            if missing.code not in unit.ignored_codes:
-                findings.append(missing)
     findings.extend(_definition_findings(units))
     return sorted(findings, key=lambda finding: (finding.line, finding.code))

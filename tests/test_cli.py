@@ -30,17 +30,22 @@ def test_json_report(tmp_path: Path) -> None:
     )
     assert run_check(args) == 0
     payload = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["summary"] == {"errors": 0, "warnings": 1, "total": 1}
-    assert payload["findings"][0]["code"] == "ST004"
+    assert payload["summary"] == {"errors": 0, "warnings": 0, "total": 0}
+    assert payload["findings"] == []
 
 
 def test_source_directory_and_html_report(tmp_path: Path) -> None:
     notes = tmp_path / "notes.md"
     sources = tmp_path / "materials"
     sources.mkdir()
-    notes.write_text("信息能够减少决策过程中的不确定性。", encoding="utf-8")
+    notes.write_text(
+        "信息能够减少决策过程中的不确定性。[slides.md#page=1]",
+        encoding="utf-8",
+    )
     (sources / "slides.md").write_text(
-        "信息能够减少决策过程中的不确定性。", encoding="utf-8"
+        "<!-- page: 1 -->\n本页介绍信息系统的组成。\n"
+        "<!-- page: 4 -->\n信息能够减少决策过程中的不确定性。",
+        encoding="utf-8",
     )
 
     args = build_parser().parse_args(
@@ -65,7 +70,7 @@ def test_html_escapes_user_content(tmp_path: Path) -> None:
         tmp_path / "notes.md",
         [
             Finding(
-                "ST004",
+                "ST006",
                 "warning",
                 1,
                 "<script>alert(1)</script>",
@@ -90,7 +95,7 @@ def test_gui_check_creates_report(tmp_path: Path) -> None:
 
     output, counts = check_to_html(notes, sources)
     assert output.is_file()
-    assert counts["warnings"] == 1
+    assert counts["warnings"] == 0
 
 
 def test_gui_check_accepts_individual_source_files(tmp_path: Path) -> None:
@@ -110,7 +115,7 @@ def test_gui_check_accepts_individual_source_files(tmp_path: Path) -> None:
     output, counts = check_to_html(notes, [first, second])
 
     assert output.is_file()
-    assert counts["warnings"] == 1
+    assert counts["warnings"] == 0
 
 
 def sample_verification() -> PaperVerification:

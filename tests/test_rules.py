@@ -31,13 +31,13 @@ def test_missing_source_and_invalid_page(tmp_path: Path) -> None:
     assert codes == ["ST001", "ST002"]
 
 
-def test_quote_missing_and_uncited_claim(tmp_path: Path) -> None:
+def test_quote_missing_and_uncited_claim_is_not_flagged(tmp_path: Path) -> None:
     codes = _lint(
         tmp_path,
         "课程明确要求“逐字背诵所有例子”。[slides.md#page=1]\n这是一条没有引用来源的重要学习结论。",
         "课程要求理解概念，不要求背诵例子。",
     )
-    assert codes == ["ST003", "ST004"]
+    assert codes == ["ST003"]
 
 
 def test_conflicting_definitions(tmp_path: Path) -> None:
@@ -53,26 +53,41 @@ def test_conflicting_definitions(tmp_path: Path) -> None:
 def test_ignore_next_rule(tmp_path: Path) -> None:
     codes = _lint(
         tmp_path,
-        "<!-- studylint-ignore ST004 -->\n这是一条明确选择忽略引用检查的较长笔记。",
-        "课程材料。",
+        "信息：能够减少不确定性的内容。\n"
+        "<!-- studylint-ignore ST005 -->\n"
+        "信息：没有经过处理的随机字符集合。",
+        "信息是能够减少不确定性的内容。",
     )
     assert codes == []
 
 
-def test_uncited_claim_has_evidence_suggestion(tmp_path: Path) -> None:
+def test_cited_mismatch_has_evidence_suggestion(tmp_path: Path) -> None:
     notes_path = tmp_path / "notes.md"
     source_path = tmp_path / "slides.md"
-    notes_path.write_text("信息能够减少决策过程中的不确定性。", encoding="utf-8")
+    notes_path.write_text(
+        "信息能够减少决策过程中的不确定性。[slides.md#page=1]",
+        encoding="utf-8",
+    )
     source_path.write_text(
+        "<!-- page: 1 -->\n本页介绍信息系统的组成。\n"
         "<!-- page: 4 -->\n信息能够减少决策过程中的不确定性。",
         encoding="utf-8",
     )
 
     findings = lint(parse_notes(notes_path), [load_source(source_path)])
-    assert findings[0].code == "ST007"
+    assert findings[0].code == "ST006"
     assert findings[0].suggestions[0].source_name == "slides.md"
     assert findings[0].suggestions[0].locator_value == 4
     assert findings[0].suggestions[0].score >= 90
+
+
+def test_uncited_claim_is_not_flagged(tmp_path: Path) -> None:
+    codes = _lint(
+        tmp_path,
+        "研究表明该方法能够提高效率37%，而且一定优于其他方法。",
+        "课程材料。",
+    )
+    assert codes == []
 
 
 def test_cited_claim_matches_marked_page(tmp_path: Path) -> None:
