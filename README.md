@@ -9,7 +9,7 @@
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-4338CA">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-2DD4BF">
-  <img alt="Version 0.5.1" src="https://img.shields.io/badge/Version-0.5.1-F59E0B">
+  <img alt="Version 0.5.2" src="https://img.shields.io/badge/Version-0.5.2-F59E0B">
 </p>
 
 <p align="center">
@@ -26,7 +26,7 @@ StudyLint 是一个面向AI学习场景的证据核查工具。把AI整理的笔
 
 ## 主要功能
 
-- **自动发现课程材料**：选择资料文件夹即可递归读取支持的文件。
+- **灵活添加课程材料**：可以直接选择一个或多个资料文件，也可以选择文件夹递归读取。
 - **检查页码和时间点**：发现不存在的PDF页码、PPT页码或字幕时间点。
 - **核对页码是否支持结论**：不是只判断页码存在，还检查笔记内容与指定位置是否有明显文本关联。
 - **核对直接引语**：检查引号内的原文能否在指定来源位置找到。
@@ -56,7 +56,7 @@ studylint gui
 然后：
 
 1. 选择一份`.md`、`.txt`或`.docx`笔记；
-2. 选择存放PPT、PDF和课堂转写的资料文件夹；
+2. 直接选择一个或多个PDF、PPT、Word等资料文件，或选择整个资料文件夹；
 3. 点击“开始事实与引用核查”；
 4. 在浏览器中分别查看确定错误、事实支持不足、内部冲突和证据候选。
 

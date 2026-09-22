@@ -93,6 +93,26 @@ def test_gui_check_creates_report(tmp_path: Path) -> None:
     assert counts["warnings"] == 1
 
 
+def test_gui_check_accepts_individual_source_files(tmp_path: Path) -> None:
+    import pymupdf
+
+    notes = tmp_path / "notes.txt"
+    first = tmp_path / "slides.pdf"
+    second = tmp_path / "lecture.md"
+    notes.write_text("这是一条没有来源但可以检查的较长结论。", encoding="utf-8")
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "First course source")
+    document.save(first)
+    document.close()
+    second.write_text("第二份课程资料。", encoding="utf-8")
+
+    output, counts = check_to_html(notes, [first, second])
+
+    assert output.is_file()
+    assert counts["warnings"] == 1
+
+
 def sample_verification() -> PaperVerification:
     return PaperVerification(
         query="测试论文",
