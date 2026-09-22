@@ -22,7 +22,7 @@
 - [ ] 将 `assets/social-preview.png` 上传到仓库社交预览设置。
 - [ ] 运行 `pytest -q`。
 - [ ] 确认示例中不存在受版权保护或私人资料。
-- [ ] 创建标签 `v0.5.3`；发布工作流将构建Windows可执行文件并创建GitHub Release。
+- [ ] 创建标签 `v0.5.4`；发布工作流将构建Windows可执行文件并创建GitHub Release。
 
 ## 首次发布文案
 

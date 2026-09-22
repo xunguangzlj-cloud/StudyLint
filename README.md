@@ -9,7 +9,7 @@
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-4338CA">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-2DD4BF">
-  <img alt="Version 0.5.3" src="https://img.shields.io/badge/Version-0.5.3-F59E0B">
+  <img alt="Version 0.5.4" src="https://img.shields.io/badge/Version-0.5.4-F59E0B">
 </p>
 
 <p align="center">
@@ -32,7 +32,7 @@ StudyLint 是一个面向AI学习场景的证据核查工具。把AI整理的笔
 - **核对直接引语**：检查引号内的原文能否在指定来源位置找到。
 - **识别无法自动核验的页**：扫描图片页、空文本页和同名来源会单独提示，而不是误判内容错误。
 - **推荐可能证据**：使用本地文本匹配提供最多3条候选来源，由用户最终确认。
-- **发现冲突定义**：提示同一术语在笔记中出现差异较大的定义。
+- **发现冲突定义**：只对明确的定义表达或加粗术语标题比较定义，跳过表格字段和场景标签。
 - **离线HTML报告**：显示问题原因、修改建议、笔记原文和可点击来源。
 - **批量论文核验**：通过Crossref与OpenAlex核验DOI或题名，过滤低相关结果，并提供知网等人工检索入口。
 - **图形界面与CLI**：普通学生使用文件选择界面，开发者可使用终端和JSON。
@@ -180,7 +180,7 @@ Markdown或TXT来源可以用标记模拟页码：
 | `ST001` | 错误 | 引用的来源文件没有提供 |
 | `ST002` | 错误 | 引用页码或时间点无效 |
 | `ST003` | 错误 | 引号内的原文没有出现在引用位置 |
-| `ST005` | 警告 | 同一术语出现差异较大的定义 |
+| `ST005` | 警告 | 明确定义的同一术语出现差异较大的解释 |
 | `ST006` | 警告 | 笔记结论与所标页码或时间点缺少明显关联 |
 | `ST008` | 警告 | 引用位置没有可提取文字，无法自动核验 |
 | `ST009` | 错误 | 资料目录存在同名文件，引用来源不明确 |
@@ -229,7 +229,7 @@ pytest -q
 
 ## English summary
 
-StudyLint is a local-first guard against hallucinated study notes and paper citations. It checks source locations, quotation accuracy, claim-to-page support, risky uncited facts, conflicting definitions, and batches suspicious references for metadata and manual verification.
+StudyLint is a local-first guard against hallucinated study notes and paper citations. It checks source locations, quotation accuracy, claim-to-page support, explicit conflicting definitions, and batches suspicious references for metadata and manual verification.
 
 ## License
 

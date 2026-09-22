@@ -19,7 +19,10 @@ from studylint.parsers import CITATION_PATTERN
 
 QUOTE_PATTERN = re.compile(r"“([^”]{4,})”|\"([^\"]{4,})\"")
 DEFINITION_PATTERN = re.compile(
-    r"^(?:[-*+]\s*)?(?:\*\*)?([^:：]{2,40}?)(?:\*\*)?\s*[:：]\s*(.+)$"
+    r"^(?:[-*+]\s+)?(\*\*[^*]{2,40}\*\*|[^:：]{2,40}?)\s*[:：]\s*(.+)$"
+)
+DEFINITION_CUE_PATTERN = re.compile(
+    r"^(?:是指|指的是|可定义为|定义为|即为|即是|意为|表示|是|指)"
 )
 @lru_cache(maxsize=2048)
 def _normalize(text: str) -> str:
@@ -255,11 +258,17 @@ def _definition_findings(units: list[NoteUnit]) -> list[Finding]:
     definitions: dict[str, list[tuple[NoteUnit, str, str]]] = defaultdict(list)
     for unit in units:
         text = CITATION_PATTERN.sub("", unit.text).strip()
+        if text.startswith("|") or text.count("|") >= 2:
+            continue
         match = DEFINITION_PATTERN.match(text)
         if not match:
             continue
-        term = re.sub(r"[*_`]", "", match.group(1)).strip()
+        raw_term = match.group(1).strip()
         definition = match.group(2).strip()
+        explicitly_formatted = raw_term.startswith("**") and raw_term.endswith("**")
+        if not explicitly_formatted and not DEFINITION_CUE_PATTERN.match(definition):
+            continue
+        term = re.sub(r"[*_`]", "", raw_term).strip()
         definitions[term.casefold()].append((unit, term, definition))
 
     findings: list[Finding] = []

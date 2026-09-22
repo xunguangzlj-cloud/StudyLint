@@ -43,8 +43,8 @@ def test_quote_missing_and_uncited_claim_is_not_flagged(tmp_path: Path) -> None:
 def test_conflicting_definitions(tmp_path: Path) -> None:
     codes = _lint(
         tmp_path,
-        "信息：能够减少不确定性的内容。[slides.md#page=1]\n"
-        "信息：没有经过处理的随机字符集合。[slides.md#page=1]",
+        "信息：是能够减少不确定性的内容。[slides.md#page=1]\n"
+        "信息：是没有经过处理的随机字符集合。[slides.md#page=1]",
         "信息是能够减少不确定性的内容。",
     )
     assert codes == ["ST005", "ST006"]
@@ -53,12 +53,33 @@ def test_conflicting_definitions(tmp_path: Path) -> None:
 def test_ignore_next_rule(tmp_path: Path) -> None:
     codes = _lint(
         tmp_path,
-        "信息：能够减少不确定性的内容。\n"
+        "信息：是能够减少不确定性的内容。\n"
         "<!-- studylint-ignore ST005 -->\n"
-        "信息：没有经过处理的随机字符集合。",
+        "信息：是没有经过处理的随机字符集合。",
         "信息是能够减少不确定性的内容。",
     )
     assert codes == []
+
+
+def test_table_rows_and_scene_labels_are_not_definitions(tmp_path: Path) -> None:
+    codes = _lint(
+        tmp_path,
+        "| 07:10 | 推荐 | 推荐算法、**信息组织**、信息服务 |\n"
+        "| 07:25 | 导航 | **信息需求**、相关性 |\n"
+        "- 场景：导航‘哪条路线最好’——A换乘少 / B步行少",
+        "课程材料。",
+    )
+    assert codes == []
+
+
+def test_bold_terms_can_still_report_definition_conflicts(tmp_path: Path) -> None:
+    codes = _lint(
+        tmp_path,
+        "**信息**：能够减少不确定性的内容。\n"
+        "**信息**：没有经过处理的随机字符集合。",
+        "课程材料。",
+    )
+    assert codes == ["ST005"]
 
 
 def test_cited_mismatch_has_evidence_suggestion(tmp_path: Path) -> None:
