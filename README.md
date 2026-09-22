@@ -6,6 +6,8 @@
 
 <p align="center"><strong>打破学习中的AI幻觉：核查笔记事实，也核查论文引用。</strong></p>
 
+<p align="center"><a href="README.md">简体中文</a> · <a href="README_EN.md">English</a></p>
+
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-4338CA">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-2DD4BF">

@@ -28,4 +28,10 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create $env:GITHUB_REF_NAME dist/StudyLint.exe --generate-notes
+        run: |
+          $notes = "docs/release-notes/$env:GITHUB_REF_NAME.md"
+          if (Test-Path $notes) {
+            gh release create $env:GITHUB_REF_NAME dist/StudyLint.exe --title "StudyLint $env:GITHUB_REF_NAME" --notes-file $notes
+          } else {
+            gh release create $env:GITHUB_REF_NAME dist/StudyLint.exe --generate-notes
+          }
