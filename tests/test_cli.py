@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from studylint import PROJECT_URL
 from studylint.cli import build_parser, run_check, run_paper
 from studylint.gui import check_to_html, paper_to_html, papers_to_html
 from studylint.models import Finding
@@ -76,6 +77,8 @@ def test_html_escapes_user_content(tmp_path: Path) -> None:
     assert "<script>alert(1)</script>" not in report
     assert "&lt;script&gt;" in report
     assert "<img src=x" not in report
+    assert ">⭐ Star</a>" in report
+    assert PROJECT_URL in report
 
 
 def test_gui_check_creates_report(tmp_path: Path) -> None:

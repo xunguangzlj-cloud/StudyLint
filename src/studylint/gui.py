@@ -6,6 +6,7 @@ import threading
 import webbrowser
 from pathlib import Path
 
+from studylint import AUTHOR_URL, PROJECT_URL
 from studylint.parsers import discover_sources, load_sources, parse_notes
 from studylint.papers import (
     PaperLookupError,
@@ -278,6 +279,33 @@ def main() -> None:
     ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(20, 0))
     papers_tab.columnconfigure(1, weight=1)
     papers_tab.rowconfigure(1, weight=1)
+
+    support = ttk.Frame(outer)
+    support.pack(fill="x", pady=(8, 0))
+    ttk.Label(
+        support,
+        text="StudyLint",
+        foreground="#656d76",
+        font=("Segoe UI", 9),
+    ).pack(side="left")
+    star_link = ttk.Label(
+        support,
+        text="  ·  ⭐ Star",
+        foreground="#4338ca",
+        cursor="hand2",
+        font=("Segoe UI", 9, "underline"),
+    )
+    star_link.pack(side="left")
+    star_link.bind("<Button-1>", lambda _event: webbrowser.open(PROJECT_URL))
+    author_link = ttk.Label(
+        support,
+        text="  ·  作者",
+        foreground="#4338ca",
+        cursor="hand2",
+        font=("Segoe UI", 9, "underline"),
+    )
+    author_link.pack(side="left")
+    author_link.bind("<Button-1>", lambda _event: webbrowser.open(AUTHOR_URL))
 
     root.mainloop()
 

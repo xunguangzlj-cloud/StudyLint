@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from studylint import PROJECT_URL
 from studylint.papers import extract_doi, parse_queries, read_query_file, verify_paper
 from studylint.reporters import paper_status, render_paper_batch_html, render_paper_html
 
@@ -136,3 +137,5 @@ def test_batch_report_contains_summary(monkeypatch) -> None:
     assert 'target="_blank"' in report
     assert "一键在知网核查全部 2 篇" in report
     assert "openManualChecks" in report
+    assert ">⭐ Star</a>" in report
+    assert PROJECT_URL in report

@@ -9,7 +9,11 @@
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-4338CA">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-2DD4BF">
-  <img alt="Version 0.5" src="https://img.shields.io/badge/Version-0.5-F59E0B">
+  <img alt="Version 0.5.1" src="https://img.shields.io/badge/Version-0.5.1-F59E0B">
+</p>
+
+<p align="center">
+  <sub><a href="https://github.com/xunguangzlj-cloud/StudyLint">⭐ Star</a> · <a href="https://github.com/xunguangzlj-cloud">作者</a></sub>
 </p>
 
 StudyLint 是一个面向AI学习场景的证据核查工具。把AI整理的笔记和可信课程材料交给它，它会检查失效引用、页码与结论不匹配、直接引语错误、高风险事实缺少来源和冲突定义；把AI生成的参考文献交给它，它会批量核验开放元数据并提供人工检索入口。

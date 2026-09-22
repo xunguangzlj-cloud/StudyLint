@@ -4,8 +4,18 @@ import html
 import json
 from pathlib import Path
 
+from studylint import AUTHOR_URL, PROJECT_URL
 from studylint.models import Finding
 from studylint.papers import PaperVerification
+
+
+def _support_footer() -> str:
+    return (
+        '<aside class="project-support"><span>StudyLint</span>'
+        f'<a target="_blank" rel="noopener noreferrer" href="{PROJECT_URL}">⭐ Star</a>'
+        f'<a target="_blank" rel="noopener noreferrer" href="{AUTHOR_URL}">作者</a>'
+        "</aside>"
+    )
 
 
 def summary(findings: list[Finding]) -> dict[str, int]:
@@ -202,6 +212,7 @@ def render_paper_batch_html(verifications: list[PaperVerification]) -> str:
     .manual {{ margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }} .search {{ display:inline-block; margin:8px 8px 0 0; padding:7px 11px; color:var(--accent); border:1px solid #a5b4fc; border-radius:7px; text-decoration:none; }}
     .batch-actions {{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 24px; }} .open-all {{ border:0; padding:11px 16px; color:#fff; background:var(--accent); border-radius:8px; cursor:pointer; font:inherit; font-weight:700; }} .popup-tip {{ color:var(--muted); font-size:13px; }}
     .warnings {{ color:#9a6700; }} .notice {{ margin-top:28px; padding-top:18px; border-top:1px solid var(--border); font-size:14px; }}
+    .project-support {{ margin-top:24px; padding-top:10px; border-top:1px solid var(--border); color:var(--muted); font-size:12px; text-align:right; }} .project-support a {{ margin-left:10px; color:var(--muted); text-decoration:none; }} .project-support a:hover {{ color:var(--accent); text-decoration:underline; }}
   </style>
 </head>
 <body><main>
@@ -210,6 +221,7 @@ def render_paper_batch_html(verifications: list[PaperVerification]) -> str:
   <div class="batch-actions">{batch_action}</div>
   {sections}
   <p class="notice">开放元数据记录可以证明文献元数据已登记，但不能单独证明论文内容真实可靠。知网等检索按钮仅打开对应搜索页，不代表StudyLint已经确认其收录。</p>
+  {_support_footer()}
   <script>
     const manualCheckUrls = {manual_urls_json};
     function openManualChecks() {{
@@ -315,6 +327,7 @@ def render_html(notes_path: Path, findings: list[Finding]) -> str:
     .suggestions a {{ color:var(--accent); font-weight:650; }} .score {{ margin-left:10px; color:var(--muted); font-size:14px; }}
     blockquote {{ margin:7px 0; padding:8px 12px; border-left:3px solid #a5b4fc; background:#f8faff; }}
     .disclaimer {{ color:var(--muted); font-size:13px; }}
+    .project-support {{ margin-top:24px; padding-top:10px; border-top:1px solid var(--border); color:var(--muted); font-size:12px; text-align:right; }} .project-support a {{ margin-left:10px; color:var(--muted); text-decoration:none; }} .project-support a:hover {{ color:var(--accent); text-decoration:underline; }}
   </style>
 </head>
 <body><main>
@@ -325,4 +338,5 @@ def render_html(notes_path: Path, findings: list[Finding]) -> str:
     <div><strong>{counts['total']}</strong>全部问题</div>
   </section>
   {empty_state}{''.join(cards)}
+  {_support_footer()}
 </main></body></html>"""

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "studylint"
-version = "0.5.0"
+version = "0.5.1"
 description = "A local-first guard against hallucinated study notes and paper citations."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,6 +27,12 @@ dependencies = [
   "python-docx>=1.1",
   "rapidfuzz>=3.9",
 ]
+
+[project.urls]
+Homepage = "https://github.com/xunguangzlj-cloud/StudyLint"
+Repository = "https://github.com/xunguangzlj-cloud/StudyLint"
+Issues = "https://github.com/xunguangzlj-cloud/StudyLint/issues"
+Author = "https://github.com/xunguangzlj-cloud"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
