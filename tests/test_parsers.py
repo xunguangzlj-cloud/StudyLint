@@ -1,4 +1,5 @@
 from pathlib import Path
+from zipfile import ZipFile
 
 from studylint.parsers import (
     discover_sources,
@@ -99,6 +100,48 @@ def test_docx_notes(tmp_path: Path) -> None:
     units = parse_notes(notes)
     assert len(units) == 1
     assert units[0].citations[0].locator_value == 2
+
+
+def test_pdf_notes(tmp_path: Path) -> None:
+    import pymupdf
+
+    notes = tmp_path / "notes.pdf"
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "A summary statement")
+    document.save(notes)
+    document.close()
+
+    units = parse_notes(notes)
+
+    assert [unit.text for unit in units] == ["A summary statement"]
+
+
+def test_epub_source_and_notes(tmp_path: Path) -> None:
+    book = tmp_path / "book.epub"
+    with ZipFile(book, "w") as archive:
+        archive.writestr(
+            "META-INF/container.xml",
+            '<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+            '<rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>',
+        )
+        archive.writestr(
+            "OEBPS/content.opf",
+            '<package xmlns="http://www.idpf.org/2007/opf"><manifest>'
+            '<item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>'
+            '</manifest><spine><itemref idref="chapter"/></spine></package>',
+        )
+        archive.writestr(
+            "OEBPS/chapter.xhtml",
+            "<html><body><h1>Chapter one</h1><p>Evidence sentence.</p></body></html>",
+        )
+
+    parsed = load_source(book)
+    units = parse_notes(book)
+
+    assert parsed.spans[0].locator_type == "chapter"
+    assert "Evidence sentence." in parsed.spans[0].text
+    assert any("Evidence sentence." in unit.text for unit in units)
 
 
 def test_discover_sources_excludes_notes(tmp_path: Path) -> None:

@@ -150,3 +150,30 @@ def test_duplicate_source_names_are_ambiguous(tmp_path: Path) -> None:
 
     findings = lint(parse_notes(notes_path), [load_source(first), load_source(second)])
     assert [finding.code for finding in findings] == ["ST009"]
+
+
+def test_cited_number_mismatch_is_reported(tmp_path: Path) -> None:
+    notes_path = tmp_path / "notes.md"
+    source_path = tmp_path / "slides.md"
+    notes_path.write_text(
+        "该实验准确率达到89.0%。[slides.md#page=1]", encoding="utf-8"
+    )
+    source_path.write_text(
+        "<!-- page: 1 -->\n该实验的准确率达到94%。", encoding="utf-8"
+    )
+
+    findings = lint(parse_notes(notes_path), [load_source(source_path)])
+
+    assert [finding.code for finding in findings] == ["ST010"]
+    assert "89%" in findings[0].message
+    assert "94%" in findings[0].suggestions[0].excerpt
+
+
+def test_equivalent_number_format_is_supported(tmp_path: Path) -> None:
+    codes = _lint(
+        tmp_path,
+        "该实验准确率达到94.0%。[slides.md#page=1]",
+        "<!-- page: 1 -->\n该实验的准确率达到94%。",
+    )
+
+    assert codes == []

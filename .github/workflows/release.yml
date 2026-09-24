@@ -17,21 +17,105 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -e ".[dev,build]"
       - run: pytest -q
+      - name: Verify Tcl/Tk runtime
+        run: python -c "import tkinter; root = tkinter.Tcl(); print(root.eval('info patchlevel'))"
       - name: Build portable executable
-        run: >-
-          pyinstaller --noconfirm --clean --onefile --windowed
-          --name StudyLint
-          --collect-all pymupdf
-          --collect-all pptx
-          src/studylint/gui.py
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed `
+            --name StudyLint `
+            --icon src/studylint/assets/studylint.ico `
+            --add-data "src/studylint/assets/studylint.ico;studylint/assets" `
+            --collect-all pymupdf `
+            --collect-all pptx `
+            src/studylint/gui.py
+
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          New-Item -ItemType Directory -Force release | Out-Null
+          Compress-Archive -Path dist/StudyLint.exe `
+            -DestinationPath "release/StudyLint-$version-windows-x64-portable.zip"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress --limit-output
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+          if ($null -eq $iscc) {
+            $fallbacks = @(
+              "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+              "$env:ProgramFiles\Inno Setup 7\ISCC.exe",
+              "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+            )
+            $isccPath = $fallbacks |
+              Where-Object { Test-Path -LiteralPath $_ } |
+              Select-Object -First 1
+            if ($null -eq $isccPath) {
+              throw "Inno Setup compiler was not found."
+            }
+          } else {
+            $isccPath = $iscc.Source
+          }
+
+          $env:STUDYLINT_VERSION = $version
+          & $isccPath "installer/StudyLint.iss"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE."
+          }
+
+          $setup = "release/StudyLint-$version-windows-x64-setup.exe"
+          if (-not (Test-Path -LiteralPath $setup)) {
+            throw "Expected installer was not created: $setup"
+          }
+
+      - name: Verify release artifacts
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $artifacts = @(
+            "release/StudyLint-$version-windows-x64-setup.exe",
+            "release/StudyLint-$version-windows-x64-portable.zip"
+          )
+          foreach ($artifact in $artifacts) {
+            if (-not (Test-Path -LiteralPath $artifact)) {
+              throw "Missing release artifact: $artifact"
+            }
+            if ((Get-Item -LiteralPath $artifact).Length -eq 0) {
+              throw "Empty release artifact: $artifact"
+            }
+          }
+          $checksums = foreach ($artifact in $artifacts) {
+            $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $artifact
+            "$($hash.Hash.ToLower())  $([IO.Path]::GetFileName($artifact))"
+          }
+          $checksums | Set-Content -Encoding ascii "release/SHA256SUMS.txt"
+
       - name: Create GitHub release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
           $notes = "docs/release-notes/$env:GITHUB_REF_NAME.md"
+          $releaseArgs = @(
+            "release",
+            "create",
+            $env:GITHUB_REF_NAME,
+            "release/StudyLint-$version-windows-x64-setup.exe",
+            "release/StudyLint-$version-windows-x64-portable.zip",
+            "release/SHA256SUMS.txt",
+            "--title",
+            "StudyLint $env:GITHUB_REF_NAME"
+          )
           if (Test-Path $notes) {
-            gh release create $env:GITHUB_REF_NAME dist/StudyLint.exe --title "StudyLint $env:GITHUB_REF_NAME" --notes-file $notes
+            $releaseArgs += @("--notes-file", $notes)
           } else {
-            gh release create $env:GITHUB_REF_NAME dist/StudyLint.exe --generate-notes
+            $releaseArgs += "--generate-notes"
+          }
+          & gh @releaseArgs
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub release creation failed with exit code $LASTEXITCODE."
           }

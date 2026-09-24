@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 
 from rapidfuzz import fuzz
@@ -23,6 +24,9 @@ DEFINITION_PATTERN = re.compile(
 )
 DEFINITION_CUE_PATTERN = re.compile(
     r"^(?:是指|指的是|可定义为|定义为|即为|即是|意为|表示|是|指)"
+)
+NUMBER_PATTERN = re.compile(
+    r"(?<![\d.])(?:\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:\s*%)?"
 )
 @lru_cache(maxsize=2048)
 def _normalize(text: str) -> str:
@@ -229,6 +233,58 @@ def _claim_text(text: str) -> str:
     ).strip()
 
 
+def _normalized_numbers(text: str) -> tuple[str, ...]:
+    numbers: list[str] = []
+    for match in NUMBER_PATTERN.finditer(text):
+        raw = match.group(0).replace(" ", "")
+        percent = raw.endswith("%")
+        raw_number = raw.removesuffix("%").replace(",", "")
+        try:
+            normalized = format(Decimal(raw_number).normalize(), "f")
+        except InvalidOperation:
+            continue
+        if normalized == "-0":
+            normalized = "0"
+        value = f"{normalized}%" if percent else normalized
+        if value not in numbers:
+            numbers.append(value)
+    return tuple(numbers)
+
+
+def _number_support_finding(
+    unit: NoteUnit,
+    spans: list[SourceSpan],
+    sources: list[SourceDocument],
+) -> Finding | None:
+    if not unit.citations or not spans or QUOTE_PATTERN.search(unit.text):
+        return None
+    claim = _claim_text(unit.text)
+    claim_numbers = _normalized_numbers(claim)
+    if not claim_numbers:
+        return None
+    if max(_support_score(claim, span.text) for span in spans) < 28:
+        return None
+    source_numbers = {
+        number for span in spans for number in _normalized_numbers(span.text)
+    }
+    unsupported = tuple(
+        number for number in claim_numbers if number not in source_numbers
+    )
+    if not unsupported:
+        return None
+    rendered = "、".join(unsupported)
+    return Finding(
+        "ST010",
+        "warning",
+        unit.line,
+        f"笔记中的数字 {rendered} 未在所标来源位置找到。",
+        title="引用中的数字可能不匹配",
+        action="打开所标页码或时间点核对数字、单位和统计口径；若引用位置写错，请更正来源标注。",
+        note_text=unit.text,
+        suggestions=_suggest_evidence(claim, sources, limit=1),
+    )
+
+
 def _citation_support_finding(
     unit: NoteUnit,
     spans: list[SourceSpan],
@@ -309,6 +365,9 @@ def lint(units: list[NoteUnit], sources: list[SourceDocument]) -> list[Finding]:
             for finding in _quote_findings(unit, spans)
             if finding.code not in unit.ignored_codes
         )
+        number_support = _number_support_finding(unit, spans, sources)
+        if number_support and number_support.code not in unit.ignored_codes:
+            findings.append(number_support)
         support = _citation_support_finding(unit, spans, sources)
         if support and support.code not in unit.ignored_codes:
             findings.append(support)

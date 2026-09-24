@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import posixpath
 import re
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
+from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import unquote
+from zipfile import BadZipFile, ZipFile
 
 from studylint.models import Citation, NoteUnit, SourceDocument, SourceSpan
 
@@ -20,8 +25,10 @@ IGNORE_PATTERN = re.compile(
     r"^\s*<!--\s*studylint-ignore\s+([A-Za-z0-9_, -]+)\s*-->\s*$",
     re.I,
 )
-SUPPORTED_SOURCE_SUFFIXES = {".md", ".txt", ".pdf", ".pptx", ".srt", ".docx"}
-SUPPORTED_NOTE_SUFFIXES = {".md", ".txt", ".docx"}
+SUPPORTED_SOURCE_SUFFIXES = {
+    ".md", ".txt", ".pdf", ".epub", ".pptx", ".srt", ".docx"
+}
+SUPPORTED_NOTE_SUFFIXES = {".md", ".txt", ".docx", ".pdf", ".epub"}
 
 
 def parse_time(value: str) -> int | None:
@@ -115,14 +122,36 @@ def _parse_docx_notes(path: Path) -> list[NoteUnit]:
     return units
 
 
+def _parse_document_notes(path: Path) -> list[NoteUnit]:
+    document = load_source(path)
+    units: list[NoteUnit] = []
+    unit_number = 0
+    for span in document.spans:
+        for raw_text in span.text.splitlines():
+            text = raw_text.strip()
+            if not text:
+                continue
+            unit_number += 1
+            units.append(
+                NoteUnit(
+                    line=unit_number,
+                    text=text,
+                    citations=extract_citations(text),
+                )
+            )
+    return units
+
+
 def parse_notes(path: Path) -> list[NoteUnit]:
     suffix = path.suffix.lower()
     if suffix in {".md", ".txt"}:
         return _parse_text_notes(path)
     if suffix == ".docx":
         return _parse_docx_notes(path)
+    if suffix in {".pdf", ".epub"}:
+        return _parse_document_notes(path)
     supported = ", ".join(sorted(SUPPORTED_NOTE_SUFFIXES))
-    raise ValueError(f"Unsupported notes type: {suffix or '(none)'}. Supported: {supported}")
+    raise ValueError(f"不支持的AI总结格式：{suffix or '(无扩展名)'}。支持：{supported}")
 
 
 def _parse_markdown_or_text(path: Path) -> SourceDocument:
@@ -156,6 +185,80 @@ def _parse_pdf(path: Path) -> SourceDocument:
     finally:
         document.close()
     return SourceDocument(path.name, path, "pdf", spans)
+
+
+class _EpubTextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.ignored_depth = 0
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag.lower() in {"script", "style", "nav"}:
+            self.ignored_depth += 1
+        elif tag.lower() in {"p", "div", "h1", "h2", "h3", "li", "br"}:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() in {"script", "style", "nav"} and self.ignored_depth:
+            self.ignored_depth -= 1
+        elif tag.lower() in {"p", "div", "h1", "h2", "h3", "li"}:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self.ignored_depth and data.strip():
+            self.parts.append(data)
+
+    def text(self) -> str:
+        lines = (
+            re.sub(r"\s+", " ", line).strip()
+            for line in "".join(self.parts).splitlines()
+        )
+        return "\n".join(line for line in lines if line)
+
+
+def _parse_epub(path: Path) -> SourceDocument:
+    try:
+        with ZipFile(path) as archive:
+            container = ET.fromstring(archive.read("META-INF/container.xml"))
+            rootfile = container.find(".//{*}rootfile")
+            if rootfile is None or not rootfile.get("full-path"):
+                raise ValueError("EPUB缺少内容清单。")
+            package_path = rootfile.get("full-path", "")
+            package = ET.fromstring(archive.read(package_path))
+            package_dir = posixpath.dirname(package_path)
+            manifest = {
+                item.get("id", ""): posixpath.normpath(
+                    posixpath.join(
+                        package_dir,
+                        unquote(item.get("href", "").split("#", 1)[0]),
+                    )
+                )
+                for item in package.findall(".//{*}manifest/{*}item")
+                if item.get("id") and item.get("href")
+            }
+            chapter_paths = [
+                manifest.get(item.get("idref", ""), "")
+                for item in package.findall(".//{*}spine/{*}itemref")
+            ]
+            spans: list[SourceSpan] = []
+            for chapter_path in chapter_paths:
+                if not chapter_path:
+                    continue
+                parser = _EpubTextParser()
+                parser.feed(
+                    archive.read(chapter_path).decode("utf-8", errors="replace")
+                )
+                text = parser.text()
+                if text:
+                    spans.append(
+                        SourceSpan(path.name, "chapter", len(spans) + 1, text)
+                    )
+    except (BadZipFile, KeyError, ET.ParseError) as error:
+        raise ValueError("EPUB文件损坏或结构不受支持。") from error
+    if not spans:
+        raise ValueError("EPUB中没有可提取的正文。")
+    return SourceDocument(path.name, path, "epub", spans)
 
 
 def _parse_pptx(path: Path) -> SourceDocument:
@@ -220,6 +323,7 @@ def load_source(path: Path) -> SourceDocument:
         ".md": _parse_markdown_or_text,
         ".txt": _parse_markdown_or_text,
         ".pdf": _parse_pdf,
+        ".epub": _parse_epub,
         ".pptx": _parse_pptx,
         ".srt": _parse_srt,
         ".docx": _parse_docx_source,
