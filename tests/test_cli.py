@@ -51,7 +51,9 @@ def test_open_local_report_uses_windows_file_association(
     report.write_text("<p>ok</p>", encoding="utf-8")
     opened: list[Path] = []
     monkeypatch.setattr(gui.sys, "platform", "win32")
-    monkeypatch.setattr(os, "startfile", lambda path: opened.append(Path(path)))
+    monkeypatch.setattr(
+        os, "startfile", lambda path: opened.append(Path(path)), raising=False
+    )
     monkeypatch.setattr(
         gui.webbrowser,
         "open_new_tab",
@@ -72,6 +74,7 @@ def test_open_local_report_falls_back_and_reports_failure(
         os,
         "startfile",
         lambda _path: (_ for _ in ()).throw(OSError("association failed")),
+        raising=False,
     )
     monkeypatch.setattr(gui.webbrowser, "open_new_tab", lambda _url: False)
 
