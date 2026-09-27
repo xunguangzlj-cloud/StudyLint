@@ -16,8 +16,8 @@
 
 ## 发布前
 
-- [x] `pyproject.toml` 作者已设置为GitHub用户名 `xunguangzlj-cloud`。
-- [x] `LICENSE` 版权归属已设置为GitHub用户名 `xunguangzlj-cloud`。
+- [x] `pyproject.toml` 作者已设置为GitHub显示名 `Lykinzlj`。
+- [x] `LICENSE` 版权归属已设置为GitHub显示名 `Lykinzlj`。
 - [x] 2026-09-21检查时，PyPI未发现名为 `studylint` 的发行包；正式发布前应再次确认。
 - [ ] 将 `assets/social-preview.png` 上传到仓库社交预览设置。
 - [ ] 运行 `pytest -q`。

@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <sub><a href="https://github.com/xunguangzlj-cloud">Author</a></sub>
+  <sub><a href="https://github.com/xunguangzlj-cloud">Author: Lykinzlj</a></sub>
 </p>
 
 StudyLint is an evidence checker for AI-assisted learning and writing. Give it an AI summary plus trusted materials, and it checks marked source locations, page-to-claim mismatches, inaccurate direct quotations, numbers, and explicit internal conflicts. Give it AI-generated references or a manuscript, and it checks paper records and whether available cited full text supports the surrounding claim.

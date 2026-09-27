@@ -19,7 +19,7 @@ from studylint.papers import PaperVerification
 def _support_footer() -> str:
     return (
         '<aside class="project-support"><span>StudyLint</span>'
-        f'<a target="_blank" rel="noopener noreferrer" href="{AUTHOR_URL}">作者</a>'
+        f'<a target="_blank" rel="noopener noreferrer" href="{AUTHOR_URL}">作者：Lykinzlj</a>'
         "</aside>"
     )
 

@@ -756,7 +756,7 @@ def test_batch_report_contains_summary(monkeypatch) -> None:
     assert "一键" not in report
     assert "openManualChecks" not in report
     assert "Star" not in report
-    assert ">作者</a>" in report
+    assert ">作者：Lykinzlj</a>" in report
     assert AUTHOR_URL in report
 
 

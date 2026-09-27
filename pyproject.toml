@@ -9,7 +9,7 @@ description = "A local-first guard against hallucinated study notes and paper ci
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-authors = [{ name = "xunguangzlj-cloud" }]
+authors = [{ name = "Lykinzlj" }]
 keywords = ["education", "citations", "study-notes", "linter", "provenance"]
 classifiers = [
   "Development Status :: 3 - Alpha",

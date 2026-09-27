@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <sub><a href="https://github.com/xunguangzlj-cloud">作者</a></sub>
+  <sub><a href="https://github.com/xunguangzlj-cloud">作者：Lykinzlj</a></sub>
 </p>
 
 StudyLint 是一个面向AI学习与AI辅助写作场景的证据核查工具。把AI总结和可信课程材料交给它，它会检查失效引用、页码与结论不匹配、直接引语错误和冲突定义；把AI生成的参考文献或写作稿交给它，它会核验论文记录，并逐处检查论述是否得到所引正文支持。

@@ -130,7 +130,7 @@ def test_html_escapes_user_content(tmp_path: Path) -> None:
     assert "&lt;script&gt;" in report
     assert "<img src=x" not in report
     assert "Star" not in report
-    assert ">作者</a>" in report
+    assert ">作者：Lykinzlj</a>" in report
     assert AUTHOR_URL in report
 
 
