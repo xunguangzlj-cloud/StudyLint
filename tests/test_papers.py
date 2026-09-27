@@ -1,11 +1,14 @@
 from pathlib import Path
+from urllib.parse import unquote
 
 import pytest
 
 from studylint import AUTHOR_URL
 from studylint.papers import (
     PaperLookupError,
+    PaperMatch,
     PaperVerification,
+    _claimed_title_fragment,
     _doaj_search,
     external_search_links,
     extract_doi,
@@ -42,6 +45,46 @@ def no_live_arxiv_requests(monkeypatch) -> None:
 def test_extract_doi_from_url() -> None:
     assert extract_doi("https://doi.org/10.1038/NATURE12373.") == "10.1038/nature12373"
     assert extract_doi("（doi:10.1038/nature12373）。") == "10.1038/nature12373"
+
+
+def test_chinese_bibliographic_reference_searches_by_title_only(monkeypatch) -> None:
+    citation = (
+        "付春苗，李超. 浅析电视纪录片叙事艺术的“故事化”理念[J]. "
+        "新闻界，2010（1）：156-157."
+    )
+    title = "浅析电视纪录片叙事艺术的“故事化”理念"
+    observed: list[str] = []
+    match = PaperMatch(
+        title=title,
+        doi="",
+        authors=("付春苗", "李超"),
+        year="2010",
+        venue="新闻界",
+        publisher="",
+        work_type="journal-article",
+        url="https://example.com/paper",
+        similarity=100,
+        source="Crossref",
+    )
+
+    def crossref_search(query: str, _email: str) -> list[PaperMatch]:
+        observed.append(query)
+        return [match]
+
+    def openalex_search(query: str, _doi: str = "") -> list[PaperMatch]:
+        observed.append(query)
+        return []
+
+    monkeypatch.setattr("studylint.papers._crossref_title_search", crossref_search)
+    monkeypatch.setattr("studylint.papers._openalex_search", openalex_search)
+
+    verification = verify_paper(citation)
+
+    assert _claimed_title_fragment(citation) == title
+    assert observed == [title, title]
+    assert verification.query == citation
+    assert all(title in unquote(link.url) for link in verification.search_links)
+    assert all("付春苗" not in unquote(link.url) for link in verification.search_links)
 
 
 def test_verify_exact_doi(monkeypatch) -> None:

@@ -434,7 +434,44 @@ def test_local_source_hides_transient_metadata_failures(tmp_path: Path) -> None:
     report = render_manuscript_html(draft, [audit])
 
     assert 'class="problem-text"' not in report
-    assert "已优先使用用户导入的本地PDF" in report
+    assert "文献记录：" not in report
+    assert "已优先使用用户导入的本地PDF" not in report
+    assert "HTTP 429" not in report
+    assert "HTTP 406" not in report
+    assert "无法解析的数据" not in report
+
+
+def test_unavailable_source_hides_lookup_noise(tmp_path: Path) -> None:
+    draft = tmp_path / "draft.txt"
+    draft.write_text(
+        "该结论引用了暂未取得原文的文献 [1]。\n参考文献\n[1] Example.\n",
+        encoding="utf-8",
+    )
+    audit = CitationAudit(
+        claim="该结论引用了暂未取得原文的文献。",
+        paragraph=1,
+        citation_number=1,
+        reference_text="Example.",
+        source_path="",
+        verdict="SOURCE_UNAVAILABLE",
+        explanation="当前未取得可用于内容核验的原文。",
+        reference_verdict="NEEDS_MANUAL",
+        reference_message="自动元数据源尚未确认该参考文献；这不代表论文不存在。",
+        reference_warnings=(
+            "OpenAlex返回HTTP 429。",
+            "Semantic Scholar返回HTTP 429。",
+            "arXiv返回HTTP 406。",
+            "DBLP返回了无法解析的数据。",
+        ),
+        source_status="UNAVAILABLE",
+        source_message="当前元数据源未提供可安全获取的开放全文。",
+    )
+
+    report = render_manuscript_html(draft, [audit])
+
+    assert "文献记录：" not in report
+    assert "自动元数据源" not in report
+    assert "当前元数据源" not in report
     assert "HTTP 429" not in report
     assert "HTTP 406" not in report
     assert "无法解析的数据" not in report

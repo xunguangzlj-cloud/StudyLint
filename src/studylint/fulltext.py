@@ -448,11 +448,43 @@ def resolve_reference_sources(
     local_matches: dict[int, Path],
     cache_dir: Path,
 ) -> dict[int, ReferenceResolution]:
-    """批量核验参考文献元数据，并独立解析本地或开放全文来源。"""
+    """优先使用本地原文，仅为尚无原文的参考文献执行在线核验。"""
     if not references:
         return {}
     numbers = list(references)
-    queries = [references[number] for number in numbers]
+    results: dict[int, ReferenceResolution] = {}
+    remote_numbers: list[int] = []
+    for number in numbers:
+        local_path = local_matches.get(number)
+        if local_path is None:
+            remote_numbers.append(number)
+            continue
+        reference = references[number]
+        fulltext = acquire_fulltext(
+            None,
+            _cache_path(cache_dir, number, reference),
+            local_path=local_path,
+        )
+        results[number] = ReferenceResolution(
+            number=number,
+            reference=reference,
+            verification_verdict="",
+            verification_message="",
+            url="",
+            work_type="",
+            is_retracted=False,
+            full_text_url="",
+            license="",
+            path=fulltext.path,
+            source_status=fulltext.status.value,
+            source_message=fulltext.message,
+            warnings=fulltext.warnings,
+        )
+
+    if not remote_numbers:
+        return {number: results[number] for number in numbers}
+
+    queries = [references[number] for number in remote_numbers]
     try:
         verifications = verify_papers(queries, include_fulltext=True)
     except PaperLookupError as error:
@@ -467,7 +499,7 @@ def resolve_reference_sources(
             for query in queries
         ]
 
-    if len(verifications) != len(numbers):
+    if len(verifications) != len(remote_numbers):
         raise RuntimeError("批量元数据核验返回数量与参考文献数量不一致。")
 
     def resolve_one(
@@ -480,8 +512,7 @@ def resolve_reference_sources(
             if verification.verdict in {"VERIFIED_METADATA", "IDENTIFIER_FOUND"}
             else None
         )
-        local_path = local_matches.get(number)
-        if downloadable_match is None and local_path is None and match is not None:
+        if downloadable_match is None and match is not None:
             fulltext = FullTextResult(
                 FullTextStatus.LOW_CONFIDENCE,
                 source_url=match.full_text_url,
@@ -494,7 +525,6 @@ def resolve_reference_sources(
             fulltext = acquire_fulltext(
                 downloadable_match,
                 _cache_path(cache_dir, number, reference),
-                local_path=local_path,
             )
         return number, ReferenceResolution(
             number=number,
@@ -512,7 +542,8 @@ def resolve_reference_sources(
             warnings=tuple(verification.warnings) + fulltext.warnings,
         )
 
-    items = list(zip(numbers, queries, verifications, strict=True))
+    items = list(zip(remote_numbers, queries, verifications, strict=True))
     workers = min(4, len(items))
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        return dict(executor.map(resolve_one, items))
+        results.update(dict(executor.map(resolve_one, items)))
+    return {number: results[number] for number in numbers}

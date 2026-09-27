@@ -315,7 +315,6 @@ def test_resolve_reference_sources_keeps_metadata_and_fulltext_states_separate(
     local = tmp_path / "local.pdf"
     local.write_bytes(b"%PDF-1.7\nlocal")
     verifications = [
-        PaperVerification("one", "bibliographic", (_match(),), verdict="VERIFIED_METADATA"),
         PaperVerification(
             "two",
             "bibliographic",
@@ -338,7 +337,8 @@ def test_resolve_reference_sources_keeps_metadata_and_fulltext_states_separate(
         tmp_path / "cache",
     )
 
-    assert results[1].verification_verdict == "VERIFIED_METADATA"
+    assert results[1].verification_verdict == ""
+    assert results[1].verification_message == ""
     assert results[1].source_status == "LOCAL_FILE"
     assert results[1].path == local
     assert results[2].verification_verdict == "PARTIAL_MATCH"
@@ -358,15 +358,15 @@ def test_metadata_service_failure_does_not_hide_valid_local_pdf(
     def fail_lookup(
         _queries: list[str], **_kwargs
     ) -> list[PaperVerification]:
-        raise PaperLookupError("元数据服务超时")
+        raise AssertionError("已有本地原文时不应进行在线检索")
 
     monkeypatch.setattr(fulltext, "verify_papers", fail_lookup)
     results = resolve_reference_sources(
         {1: "one"}, {1: local}, tmp_path / "cache"
     )
 
-    assert results[1].verification_verdict == "LOOKUP_FAILED"
-    assert "不代表论文不存在" in results[1].verification_message
+    assert results[1].verification_verdict == ""
+    assert results[1].verification_message == ""
     assert results[1].source_status == "LOCAL_FILE"
     assert results[1].path == local
 

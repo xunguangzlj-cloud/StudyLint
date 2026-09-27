@@ -233,6 +233,14 @@ def _similarity(query: str, title: str) -> int:
 def _claimed_title_fragment(query: str) -> str:
     context = DOI_PATTERN.sub("", query)
     context = re.sub(r"\bdoi\b\s*: ?", "", context, flags=re.IGNORECASE)
+    chinese_style = re.search(
+        r"(?:^|[.。]\s*)(?P<title>[^.。]+?)\s*[\[［]\s*[A-Za-z]+(?:/[A-Za-z]+)?\s*[\]］]",
+        context,
+    )
+    if chinese_style:
+        title = chinese_style.group("title").strip(" \t\r\n,，;；:：")
+        if len(_normalized_title(title)) >= 8:
+            return title
     year = re.search(
         r"[（(\[]\s*(?:19|20)\d{2}[a-z]?\s*[）)\]]",
         context,
@@ -869,7 +877,8 @@ def verify_paper(
     if not cleaned:
         raise ValueError("请输入论文标题、完整参考文献或DOI。")
 
-    links = external_search_links(cleaned)
+    search_query = _claimed_title_fragment(cleaned) or cleaned
+    links = external_search_links(search_query)
     warnings: list[str] = []
     doi = extract_doi(cleaned)
     if doi:
@@ -928,8 +937,8 @@ def verify_paper(
     matches: list[PaperMatch] = []
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = (
-            executor.submit(_crossref_title_search, cleaned, email),
-            executor.submit(_openalex_search, cleaned),
+            executor.submit(_crossref_title_search, search_query, email),
+            executor.submit(_openalex_search, search_query),
         )
         for future in futures:
             try:
@@ -955,11 +964,11 @@ def verify_paper(
     ):
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = (
-                executor.submit(_semantic_scholar_search, cleaned),
-                executor.submit(_arxiv_search, cleaned),
-                executor.submit(_dblp_search, cleaned),
-                executor.submit(_europe_pmc_search, cleaned),
-                executor.submit(_doaj_search, cleaned),
+                executor.submit(_semantic_scholar_search, search_query),
+                executor.submit(_arxiv_search, search_query),
+                executor.submit(_dblp_search, search_query),
+                executor.submit(_europe_pmc_search, search_query),
+                executor.submit(_doaj_search, search_query),
             )
             for future in futures:
                 try:

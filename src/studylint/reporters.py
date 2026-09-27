@@ -337,6 +337,11 @@ def _reference_requires_review(audit: CitationAudit) -> bool:
         "LOOKUP_FAILED",
     }:
         return False
+    if (
+        audit.verdict == "SOURCE_UNAVAILABLE"
+        and audit.reference_verdict not in {"METADATA_MISMATCH", "RETRACTED"}
+    ):
+        return False
     return not (
         audit.source_status == "LOCAL_FILE"
         and audit.reference_verdict in {
@@ -554,28 +559,20 @@ def render_manuscript_html(
             else ""
         )
         reference_check = ""
-        if audit.reference_verdict or audit.source_status:
-            hide_unconfirmed_metadata = (
-                audit.source_status == "LOCAL_FILE"
-                and audit.reference_verdict in {
-                    "PARTIAL_MATCH",
-                    "NEEDS_MANUAL",
-                    "LOOKUP_FAILED",
-                }
-            )
-            reference_label = (
-                ""
-                if hide_unconfirmed_metadata
-                else REFERENCE_STATUS.get(
-                    audit.reference_verdict, audit.reference_verdict
-                )
+        show_reference_check = (
+            audit.reference_verdict in {"METADATA_MISMATCH", "RETRACTED"}
+            or audit.source_status in {"DOWNLOADED", "CACHED_FILE"}
+        )
+        if show_reference_check:
+            reference_label = REFERENCE_STATUS.get(
+                audit.reference_verdict, audit.reference_verdict
             )
             source_label = SOURCE_STATUS.get(
                 audit.source_status, audit.source_status or "未运行"
             )
             record_link = (
                 f'<a target="_blank" rel="noopener noreferrer" href="{html.escape(audit.reference_url, quote=True)}">查看文献记录</a>'
-                if audit.reference_url and not hide_unconfirmed_metadata
+                if audit.reference_url
                 else ""
             )
             warnings = "".join(
@@ -602,10 +599,9 @@ def render_manuscript_html(
                     f'<span>{html.escape(details)}</span>',
                 )
             )
-            if not hide_unconfirmed_metadata:
-                reference_parts.append(
-                    f'<p>{html.escape(audit.reference_message)}</p>'
-                )
+            reference_parts.append(
+                f'<p>{html.escape(audit.reference_message)}</p>'
+            )
             reference_parts.extend(
                 (
                     f'<p>{html.escape(audit.source_message)}</p>',
