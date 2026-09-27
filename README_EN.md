@@ -289,22 +289,6 @@ StudyLint intentionally excludes accounts, cloud sync, chat, flashcards, and stu
 - Included examples are fictional.
 - HTML reports may contain note and source excerpts and should not be shared casually.
 
-## Design references and acknowledgements
-
-- [cite-verify](https://github.com/jonckr/cite-verify) inspired bidirectional coverage/F1 title matching that resists truncated-title false positives, and separate reporting for real identifiers paired with conflicting metadata.
-- [RefChecker](https://github.com/markrussinovich/refchecker) inspired field-level checks for titles and years and conservative treatment of database candidates.
-- [CiteCheck](https://github.com/color4-alt/CiteCheck) inspired layered multi-database retrieval. StudyLint uses a lightweight tiered and parallel variant.
-- [Reference Integrity Checker](https://github.com/danielaristo/reference-integrity-checker) inspired cross-source deduplication, retraction screening, and the boundary that not found does not mean fabricated.
-- [receipts](https://github.com/JamesWeatherhead/receipts) and [ClaimLint](https://github.com/klittle32/claimlint) inspired evidence-by-evidence discrepancy reporting and the boundary that unsupported does not automatically mean false.
-- [sciwrite-lint](https://github.com/authentic-research-partners/sciwrite-lint) and the [UCL Citation Integrity Auditor](https://github.com/UCL-ERL/skills/tree/main/skills/writing/citation-integrity-auditor) inspired the claim–citation–metadata–full-text chain, graded support verdicts, and the rule that unavailable full text remains unverified.
-- [LitRAG](https://github.com/nickjlamb/litrag) inspired the two-stage design: deterministic passage location first, then model judging only where needed.
-- [RAGChecker](https://github.com/amazon-science/RAGChecker) and [DeepEval Faithfulness](https://github.com/confident-ai/deepeval/blob/main/docs/content/docs/%28rag%29/metrics-faithfulness.mdx) inspired claim-level verification, evidence grounding, and configurable judge prompts.
-- The [citation-verify skill](https://github.com/InfinityScopebio/citation-verify) inspired atomic calls, structured JSON output, and per-item failure isolation.
-- [Hallucinator](https://github.com/gianlucasb/hallucinator) inspired the arXiv, DBLP, and Europe PMC adapter strategy. Because it uses the AGPL, StudyLint learned from the design only and did not copy its code.
-- [OpenAlex](https://help.openalex.org/access/fulltext/), [Unpaywall/oadoi](https://github.com/ourresearch/oadoi), [DOAJ](https://github.com/DOAJ/doaj), [arxiv.py](https://github.com/lukasschwab/arxiv.py), [Europe PMC](https://github.com/EuropePMC), and the [Semantic Scholar API](https://api.semanticscholar.org/api-docs/) were used to verify correct open-full-text, identifier, preprint, and disciplinary-database behavior.
-
-StudyLint remains lightweight and local-first and does not include those projects' model-driven workflows. Refer to each upstream repository for its current license terms.
-
 ## License
 
 MIT

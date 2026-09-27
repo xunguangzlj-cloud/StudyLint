@@ -291,22 +291,6 @@ pytest -q
 
 StudyLint is a local-first guard against hallucinated AI summaries and paper content. It checks source locations, quotation accuracy, claim-to-source support, explicit conflicts, paper metadata, and available full text while preserving clear human-review boundaries.
 
-## 参考与学习
-
-- [cite-verify](https://github.com/jonckr/cite-verify)：启发了抗“截短题名”误判的双向覆盖率/F1匹配，以及真实DOI与错误元数据分开报告的设计。
-- [RefChecker](https://github.com/markrussinovich/refchecker)：启发了题名、年份等字段分别核对，以及对数据库结果保持审慎的做法。
-- [CiteCheck](https://github.com/color4-alt/CiteCheck)：启发了多数据库逐层补充的检索策略。StudyLint采用更轻量的分层并行变体。
-- [Reference Integrity Checker](https://github.com/danielaristo/reference-integrity-checker)：启发了多源元数据去重、撤稿筛查，以及“未找到不等于伪造”的结果边界。
-- [receipts](https://github.com/JamesWeatherhead/receipts) 与 [ClaimLint](https://github.com/klittle32/claimlint)：启发了逐条展示证据差异，并坚持“证据不足不等于事实为假”的报告边界。
-- [sciwrite-lint](https://github.com/authentic-research-partners/sciwrite-lint) 与 [UCL Citation Integrity Auditor](https://github.com/UCL-ERL/skills/tree/main/skills/writing/citation-integrity-auditor)：启发了“论述—引用—元数据—正文”核验链、分级支持结论，以及无正文时标记为无法核验的原则。
-- [LitRAG](https://github.com/nickjlamb/litrag)：启发了“先用确定性方法定位原文，再只对需要判断的项目调用模型”的两阶段结构。
-- [RAGChecker](https://github.com/amazon-science/RAGChecker) 与 [DeepEval Faithfulness](https://github.com/confident-ai/deepeval/blob/main/docs/content/docs/%28rag%29/metrics-faithfulness.mdx)：启发了逐论述核验、证据约束和可配置核验提示模板。
-- [citation-verify skill](https://github.com/InfinityScopebio/citation-verify)：启发了原子化调用、结构化JSON输出和单项失败隔离。
-- [Hallucinator](https://github.com/gianlucasb/hallucinator)：启发了arXiv、DBLP与Europe PMC等学科数据库适配思路；因其采用AGPL许可证，StudyLint仅学习设计思路，未复制其代码。
-- [OpenAlex官方客户端](https://github.com/ourresearch/openalex-guts)、[Unpaywall](https://github.com/ourresearch/oadoi)、[DOAJ](https://github.com/DOAJ/doaj)、[arxiv.py](https://github.com/lukasschwab/arxiv.py)、[Europe PMC](https://github.com/EuropePMC) 与 [Semantic Scholar API](https://api.semanticscholar.org/api-docs/)：用于核对开放全文字段、标识符、预印本和学科数据库的正确用法。StudyLint只获取来源明确且可公开访问的全文，不绕过付费墙。
-
-StudyLint的实现保持轻量、本地优先，不包含上述项目的大模型工作流。详细授权以各上游仓库的许可证文件为准。
-
 ## License
 
 MIT
