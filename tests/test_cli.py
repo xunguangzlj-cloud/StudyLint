@@ -3,7 +3,7 @@ import os
 from dataclasses import replace
 from pathlib import Path
 
-from studylint import PROJECT_URL
+from studylint import AUTHOR_URL
 from studylint import gui
 from studylint.cli import build_parser, run_check, run_manuscript, run_paper
 from studylint.gui import (
@@ -129,8 +129,9 @@ def test_html_escapes_user_content(tmp_path: Path) -> None:
     assert "<script>alert(1)</script>" not in report
     assert "&lt;script&gt;" in report
     assert "<img src=x" not in report
-    assert ">⭐ Star</a>" in report
-    assert PROJECT_URL in report
+    assert "Star" not in report
+    assert ">作者</a>" in report
+    assert AUTHOR_URL in report
 
 
 def test_gui_check_creates_report(tmp_path: Path) -> None:
@@ -377,6 +378,8 @@ def test_manuscript_html_opens_with_inline_problem_annotations(tmp_path: Path) -
     assert "疑似夸大" in report
     assert "当前表述过于确定" in report
     assert "将鼠标移到红色感叹号上查看理由" in report
+    assert "Star" not in report
+    assert AUTHOR_URL in report
 
 
 def test_supported_manuscript_text_is_not_marked_red(tmp_path: Path) -> None:

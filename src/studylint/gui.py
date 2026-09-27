@@ -8,7 +8,7 @@ import webbrowser
 from pathlib import Path
 from typing import Callable
 
-from studylint import AUTHOR_URL, PROJECT_URL
+from studylint import AUTHOR_URL
 from studylint.ai_audit import (
     AI_CUSTOM_PROVIDER,
     AI_PROVIDER_PRESETS,
@@ -695,6 +695,8 @@ def main() -> None:
 
     def finish_manuscript_error(message: str) -> None:
         manuscript_button.state(["!disabled"])
+        if last_manuscript_report is not None and last_manuscript_report.is_file():
+            manuscript_report_button.state(["!disabled"])
         manuscript_status.set(
             f"{round(manuscript_progress.get())}% · 论文内容核查失败"
         )
@@ -730,7 +732,7 @@ def main() -> None:
         if not open_local_report(output):
             messagebox.showwarning(
                 "核查报告已生成",
-                "系统未能自动打开浏览器。请点击“打开核查报告”，"
+                "系统未能自动打开浏览器。请点击“查看核查结果”，"
                 f"或手动打开：\n{output.resolve()}",
             )
 
@@ -761,6 +763,7 @@ def main() -> None:
             return
         fetch_fulltext = auto_fetch_fulltext.get()
         manuscript_button.state(["disabled"])
+        manuscript_report_button.state(["disabled"])
         set_progress(
             manuscript_progress,
             manuscript_status,
@@ -804,9 +807,10 @@ def main() -> None:
     ).grid(row=6, column=0, columnspan=4, sticky="w", pady=(6, 0))
     manuscript_report_button = ttk.Button(
         manuscript_tab,
-        text="打开核查报告",
+        text="查看核查结果",
         command=open_last_manuscript_report,
         state="disabled",
+        style="Accent.TButton",
     )
     manuscript_report_button.grid(row=6, column=4, sticky="e", pady=(6, 0))
     manuscript_tab.columnconfigure(1, weight=1)
@@ -819,15 +823,6 @@ def main() -> None:
         foreground="#656d76",
         font=("Segoe UI", 9),
     ).pack(side="left")
-    star_link = ttk.Label(
-        support,
-        text="  ·  ⭐ Star",
-        foreground="#4338ca",
-        cursor="hand2",
-        font=("Segoe UI", 9, "underline"),
-    )
-    star_link.pack(side="left")
-    star_link.bind("<Button-1>", lambda _event: webbrowser.open(PROJECT_URL))
     author_link = ttk.Label(
         support,
         text="  ·  作者",

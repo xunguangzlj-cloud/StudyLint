@@ -3,9 +3,10 @@ from __future__ import annotations
 import html
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
-from studylint import AUTHOR_URL, PROJECT_URL
+from studylint import AUTHOR_URL
 from studylint.manuscripts import (
     CitationAudit,
     ManuscriptIssue,
@@ -18,7 +19,6 @@ from studylint.papers import PaperVerification
 def _support_footer() -> str:
     return (
         '<aside class="project-support"><span>StudyLint</span>'
-        f'<a target="_blank" rel="noopener noreferrer" href="{PROJECT_URL}">⭐ Star</a>'
         f'<a target="_blank" rel="noopener noreferrer" href="{AUTHOR_URL}">作者</a>'
         "</aside>"
     )
@@ -80,81 +80,66 @@ def render_json(notes_path: Path, findings: list[Finding]) -> str:
 
 def paper_status(verification: PaperVerification) -> tuple[str, str]:
     if verification.verdict == "RETRACTED":
-        return "撤稿警告", "OpenAlex将该论文标记为已撤稿；请打开原始记录并核对撤稿说明。"
+        return "撤稿", "论文记录被标记为撤稿，请打开论文页面核对撤稿说明。"
     if verification.verdict == "METADATA_MISMATCH":
-        return "元数据冲突", "DOI真实存在，但输入的题名或参考文献信息与权威记录明显不符。"
+        return "冲突", "DOI真实存在，但输入的篇名或参考文献信息与论文记录明显不符。"
     if verification.verdict == "VERIFIED_METADATA":
-        return "元数据高度匹配", "题名与开放数据库记录高度一致；仍需人工核对作者、年份和正文。"
+        return "高度匹配", "篇名与论文记录高度一致。"
     if verification.verdict == "IDENTIFIER_FOUND":
-        source = verification.matches[0].source if verification.matches else "开放数据库"
-        return "DOI已登记", f"{source}中存在该DOI；本次输入没有足够题名信息可供比对。"
+        return "通过", "DOI已登记。"
     if verification.verdict == "PARTIAL_MATCH":
-        return "部分匹配", "找到了相关记录，但题名相似度有限，请勿直接视为核验通过。"
-    return "开放数据库未匹配", "多个开放及专业数据库当前没有可靠匹配，但这不能证明论文不存在。"
+        return "部分匹配", "找到了相近记录，但篇名只部分匹配。"
+    if verification.verdict == "LOOKUP_FAILED":
+        return "需人工核查", "当前无法完成自动核查，需要人工核查。"
+    return "未匹配", "当前没有找到可靠匹配，但这不能证明论文不存在。"
 
 
 def render_paper_console(verification: PaperVerification) -> str:
     return render_paper_batch_console([verification])
 
 
-def render_paper_batch_console(verifications: list[PaperVerification]) -> str:
-    verified = sum(
-        item.verdict in {"VERIFIED_METADATA", "IDENTIFIER_FOUND"}
-        for item in verifications
+def _paper_result(verification: PaperVerification) -> tuple[str, str, str, str]:
+    status, _ = paper_status(verification)
+    match = verification.matches[0] if verification.matches else None
+    title = match.title if match and match.title else verification.query
+    if match and match.url:
+        return title, status, "查看论文页面", match.url
+    preferred_name = (
+        "在知网搜索"
+        if any("\u4e00" <= char <= "\u9fff" for char in verification.query)
+        else "在Google Scholar搜索"
     )
-    conflicts = sum(item.verdict == "METADATA_MISMATCH" for item in verifications)
-    retracted = sum(item.verdict == "RETRACTED" for item in verifications)
-    lines = [
-        f"批量论文核验：{len(verifications)}篇，{verified}篇通过，"
-        f"{conflicts}篇元数据冲突，{retracted}篇撤稿警告"
-    ]
-    for number, verification in enumerate(verifications, start=1):
-        status, explanation = paper_status(verification)
-        lines.extend(
-            [
-                f"\n[{number}] {verification.query}",
-                f"状态：{status}（{verification.verdict}）",
-                explanation,
-            ]
-        )
-        for warning in verification.warnings:
-            lines.append(f"服务提示：{warning}")
-        for index, match in enumerate(verification.matches, start=1):
-            metadata = " · ".join(
-                value
-                for value in (
-                    ", ".join(match.authors),
-                    match.year,
-                    match.venue,
-                )
-                if value
-            )
-            lines.extend(
-                [
-                    f"  {index}. {match.title}",
-                    f"     {metadata}" if metadata else "",
-                    f"     来源：{match.source} · 匹配度：{match.similarity}%",
-                    f"     DOI：{match.doi}" if match.doi else "",
-                    f"     查看：{match.url}" if match.url else "",
-                ]
-            )
-        for link in verification.search_links:
-            lines.append(f"  {link.name}：{link.url}")
-    lines.append("\n说明：数据库未匹配不等于论文不存在；请使用知网等入口继续核查。")
-    return "\n".join(line for line in lines if line)
+    preferred = next(
+        (link for link in verification.search_links if link.name == preferred_name),
+        verification.search_links[0] if verification.search_links else None,
+    )
+    return title, status, "继续人工核查", preferred.url if preferred else ""
 
 
-def _paper_verification_html(verification: PaperVerification, number: int) -> str:
-    search_links = "".join(
-        f'<a class="search" target="_blank" rel="noopener noreferrer" href="{html.escape(link.url, quote=True)}">{html.escape(link.name)}</a>'
-        for link in verification.search_links
+def render_paper_batch_console(verifications: list[PaperVerification]) -> str:
+    accepted = {"VERIFIED_METADATA", "IDENTIFIER_FOUND"}
+    pending = [item for item in verifications if item.verdict not in accepted]
+    lines = [f"论文核验：{len(pending)}篇需要继续人工核查（通过项未显示）"]
+    for verification in pending:
+        title, status, action_label, action_url = _paper_result(verification)
+        action = f"{action_label}：{action_url}" if action_url else action_label
+        lines.append(f"{title} | {status} | {action}")
+    return "\n".join(lines)
+
+
+def _paper_verification_html(verification: PaperVerification) -> str:
+    title, status, action_label, action_url = _paper_result(verification)
+    action = (
+        f'<a class="action" target="_blank" rel="noopener noreferrer" '
+        f'href="{html.escape(action_url, quote=True)}">{action_label}</a>'
+        if action_url
+        else ""
     )
     return (
         '<section class="verification">'
-        f'<div class="query-number">待核查 {number}</div>'
-        f"<h2>{html.escape(verification.query)}</h2>"
-        '<p class="review-prompt">请自行核查这篇论文。</p>'
-        f'<div class="manual">{search_links}</div></section>'
+        f"<h2>{html.escape(title)}</h2>"
+        f'<div class="result"><span class="status">{html.escape(status)}</span>{action}</div>'
+        "</section>"
     )
 
 
@@ -166,8 +151,7 @@ def render_paper_batch_html(verifications: list[PaperVerification]) -> str:
     accepted = {"VERIFIED_METADATA", "IDENTIFIER_FOUND"}
     pending = [item for item in verifications if item.verdict not in accepted]
     sections = "".join(
-        _paper_verification_html(verification, number)
-        for number, verification in enumerate(pending, start=1)
+        _paper_verification_html(verification) for verification in pending
     )
     if not sections:
         sections = '<section class="empty">没有需要继续人工核查的论文。</section>'
@@ -181,12 +165,11 @@ def render_paper_batch_html(verifications: list[PaperVerification]) -> str:
     :root {{ --bg:#f6f8fa; --card:#fff; --text:#1f2328; --muted:#656d76; --border:#d0d7de; --accent:#4338ca; }}
     * {{ box-sizing:border-box; }} body {{ margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui,"Microsoft YaHei",sans-serif; }}
     main {{ width:min(960px,calc(100% - 32px)); margin:40px auto 80px; }} h1 {{ margin-bottom:4px; }}
-    .meta,.notice {{ color:var(--muted); }} .summary {{ display:flex; gap:12px; margin:22px 0 30px; }}
+    .meta {{ color:var(--muted); }} .summary {{ display:flex; gap:12px; margin:22px 0 30px; }}
     .summary div {{ padding:12px 18px; background:var(--card); border:1px solid var(--border); border-radius:10px; }}
     .verification,.empty {{ margin:24px 0; padding:24px; background:var(--card); border:1px solid var(--border); border-radius:14px; }}
-    .verification>h2 {{ margin:4px 0 14px; font-size:22px; }} .query-number {{ color:var(--accent); font-weight:700; }}
-    .review-prompt {{ margin:10px 0; color:var(--muted); }} .manual {{ margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }} .search {{ display:inline-block; margin:8px 8px 0 0; padding:7px 11px; color:var(--accent); border:1px solid #a5b4fc; border-radius:7px; text-decoration:none; }}
-    .notice {{ margin-top:28px; padding-top:18px; border-top:1px solid var(--border); font-size:14px; }}
+    .verification>h2 {{ margin:0 0 14px; font-size:22px; }} .result {{ display:flex; align-items:center; justify-content:space-between; gap:16px; }}
+    .status {{ font-weight:700; }} .action {{ display:inline-block; padding:7px 11px; color:var(--accent); border:1px solid #a5b4fc; border-radius:7px; text-decoration:none; }}
     .project-support {{ margin-top:24px; padding-top:10px; border-top:1px solid var(--border); color:var(--muted); font-size:12px; text-align:right; }} .project-support a {{ margin-left:10px; color:var(--muted); text-decoration:none; }} .project-support a:hover {{ color:var(--accent); text-decoration:underline; }}
   </style>
 </head>
@@ -194,7 +177,6 @@ def render_paper_batch_html(verifications: list[PaperVerification]) -> str:
   <header><h1>需要自行核查的论文</h1><div class="meta">已通过的论文不在此显示。</div></header>
   <section class="summary"><div>需要自行核查 <strong>{len(pending)}</strong> 篇</div></section>
   {sections}
-  <p class="notice">请通过上方检索入口逐篇确认。</p>
   {_support_footer()}
 </main></body></html>"""
 
@@ -346,6 +328,25 @@ def render_manuscript_json(
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
+def _reference_requires_review(audit: CitationAudit) -> bool:
+    if audit.reference_verdict not in {
+        "PARTIAL_MATCH",
+        "METADATA_MISMATCH",
+        "RETRACTED",
+        "NEEDS_MANUAL",
+        "LOOKUP_FAILED",
+    }:
+        return False
+    return not (
+        audit.source_status == "LOCAL_FILE"
+        and audit.reference_verdict in {
+            "PARTIAL_MATCH",
+            "NEEDS_MANUAL",
+            "LOOKUP_FAILED",
+        }
+    )
+
+
 def _annotation_reason(audit: CitationAudit) -> tuple[str, str] | None:
     def concise(value: str) -> str:
         cleaned = " ".join(value.split())
@@ -366,21 +367,7 @@ def _annotation_reason(audit: CitationAudit) -> tuple[str, str] | None:
         details.append(
             f"{ai_label}：{concise(audit.ai_explanation or '需要人工复核。')}"
         )
-    local_source_with_unconfirmed_metadata = (
-        audit.source_status == "LOCAL_FILE"
-        and audit.reference_verdict in {
-            "PARTIAL_MATCH",
-            "NEEDS_MANUAL",
-            "LOOKUP_FAILED",
-        }
-    )
-    if not local_source_with_unconfirmed_metadata and audit.reference_verdict in {
-        "PARTIAL_MATCH",
-        "METADATA_MISMATCH",
-        "RETRACTED",
-        "NEEDS_MANUAL",
-        "LOOKUP_FAILED",
-    }:
+    if _reference_requires_review(audit):
         reference_label = REFERENCE_STATUS.get(
             audit.reference_verdict, audit.reference_verdict
         )
@@ -400,6 +387,34 @@ def _visible_reference_warnings(warnings: tuple[str, ...]) -> tuple[str, ...]:
         re.IGNORECASE,
     )
     return tuple(value for value in warnings if not technical.search(value))
+
+
+def _manuscript_issue_counts(
+    audits: list[CitationAudit], issues: list[ManuscriptIssue]
+) -> list[tuple[str, int]]:
+    counts: Counter[str] = Counter()
+    for audit in audits:
+        if audit.verdict != "DIRECT_SUPPORT":
+            counts[MANUSCRIPT_STATUS.get(audit.verdict, (audit.verdict, ""))[0]] += 1
+        if audit.ai_verdict in {
+            "PARTIAL",
+            "CONTRADICTED",
+            "OVERSTATED",
+            "INSUFFICIENT",
+            "ERROR",
+        }:
+            if audit.ai_issue_types:
+                for issue_type in dict.fromkeys(audit.ai_issue_types):
+                    counts[AI_ISSUE_LABELS.get(issue_type, issue_type)] += 1
+            else:
+                counts[AI_STATUS.get(audit.ai_verdict, (audit.ai_verdict, ""))[0]] += 1
+        if _reference_requires_review(audit):
+            counts[
+                REFERENCE_STATUS.get(audit.reference_verdict, audit.reference_verdict)
+            ] += 1
+    for issue in issues:
+        counts[issue.category] += 1
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))
 
 
 def _find_annotation_range(text: str, excerpt: str) -> tuple[int, int] | None:

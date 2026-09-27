@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <sub><a href="https://github.com/xunguangzlj-cloud/StudyLint">⭐ Star</a> · <a href="https://github.com/xunguangzlj-cloud">Author</a></sub>
+  <sub><a href="https://github.com/xunguangzlj-cloud">Author</a></sub>
 </p>
 
 StudyLint is an evidence checker for AI-assisted learning and writing. Give it an AI summary plus trusted materials, and it checks marked source locations, page-to-claim mismatches, inaccurate direct quotations, numbers, and explicit internal conflicts. Give it AI-generated references or a manuscript, and it checks paper records and whether available cited full text supports the surrounding claim.
@@ -39,6 +39,7 @@ It never presents text similarity as verified truth. Deterministic checks need n
 - **Offline HTML reports:** show the reason, suggested action, original note, and clickable local source locations.
 - **Paper checks:** “Does the paper exist?” verifies DOI, title, year, and retraction metadata. “Paper-content hallucination check” connects each claim, citation number, reference entry, and PDF/EPUB full text.
 - **Progress and exact locations:** all three checks show a percentage and current stage. Paper-content reports identify Markdown/TXT lines, DOCX paragraphs, or PDF pages and page-local lines, alongside the exact claim and citation number.
+- **Persistent result access:** after a paper-content check finishes, click “View check results” to reopen the generated report; if automatic opening fails, StudyLint also shows the report path.
 - **Lawful open-full-text retrieval:** local PDF/EPUB files take priority. For high-confidence metadata matches, StudyLint can fetch an openly accessible PDF; failure prompts the user to import a PDF/EPUB and never proves nonexistence.
 - **Optional AI deep review:** users supply their own OpenAI-compatible endpoint, model, and API key, then select fast/strict mode and a general, biomedical, or social-science review skill. Results use 11 controlled issue categories while remaining separate from rule verdicts.
 - **GUI and CLI:** a file-picker interface for students and command-line/JSON output for developers.

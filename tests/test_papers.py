@@ -2,11 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from studylint import PROJECT_URL
+from studylint import AUTHOR_URL
 from studylint.papers import (
     PaperLookupError,
     PaperVerification,
     _doaj_search,
+    external_search_links,
     extract_doi,
     parse_queries,
     read_query_file,
@@ -55,7 +56,7 @@ def test_verify_exact_doi(monkeypatch) -> None:
     assert verification.matches[0].title == "Nanometre-scale thermometry in a living cell"
     assert verification.matches[0].similarity == 100
     assert verification.verdict == "IDENTIFIER_FOUND"
-    assert paper_status(verification)[0] == "DOI已登记"
+    assert paper_status(verification)[0] == "通过"
 
 
 def test_doi_metadata_mismatch_is_not_reported_as_verified(monkeypatch) -> None:
@@ -71,7 +72,7 @@ def test_doi_metadata_mismatch_is_not_reported_as_verified(monkeypatch) -> None:
 
     assert verification.verdict == "METADATA_MISMATCH"
     assert verification.matches[0].similarity < 55
-    assert status == "元数据冲突"
+    assert status == "冲突"
     assert "DOI真实存在" in explanation
 
 
@@ -235,7 +236,7 @@ def test_empty_result_does_not_claim_nonexistence(monkeypatch) -> None:
     verification = verify_paper("一篇不存在于数据库的虚构论文")
     status, explanation = paper_status(verification)
 
-    assert status == "开放数据库未匹配"
+    assert status == "未匹配"
     assert "不能证明论文不存在" in explanation
 
 
@@ -267,7 +268,8 @@ def test_chinese_title_filters_irrelevant_results_and_links_cnki(monkeypatch) ->
     report = render_paper_html(verification)
 
     assert verification.matches == ()
-    assert "在知网搜索" in report
+    assert "继续人工核查" in report
+    assert "kns.cnki.net" in report
     assert "降低高强混凝土黏度" not in report
 
 
@@ -662,9 +664,10 @@ def test_retracted_openalex_record_has_priority(monkeypatch) -> None:
 
     assert verification.verdict == "RETRACTED"
     assert verification.matches[0].is_retracted is True
-    assert paper_status(verification)[0] == "撤稿警告"
-    assert "请自行核查这篇论文" in report
-    assert "已撤稿" not in report
+    assert paper_status(verification)[0] == "撤稿"
+    assert "一篇后来被撤稿的论文" in report
+    assert "撤稿" in report
+    assert "查看论文页面" in report
     assert "RETRACTED" not in report
 
 
@@ -702,12 +705,14 @@ def test_batch_report_contains_summary(monkeypatch) -> None:
     report = render_paper_batch_html(verifications)
 
     assert "需要自行核查 <strong>2</strong> 篇" in report
-    assert report.count("在知网搜索") == 2
+    assert report.count("继续人工核查") == 2
+    assert report.count("kns.cnki.net") == 2
     assert 'target="_blank"' in report
     assert "一键" not in report
     assert "openManualChecks" not in report
-    assert ">⭐ Star</a>" in report
-    assert PROJECT_URL in report
+    assert "Star" not in report
+    assert ">作者</a>" in report
+    assert AUTHOR_URL in report
 
 
 def test_batch_report_hides_passed_papers() -> None:
@@ -731,3 +736,44 @@ def test_batch_report_hides_passed_papers() -> None:
     assert "已通过论文" not in report
     assert "待核查论文" in report
     assert "需要自行核查 <strong>1</strong> 篇" in report
+
+
+def test_paper_report_only_shows_title_status_and_one_action(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "studylint.papers._request_json",
+        lambda url: {"message": SAMPLE_RECORD},
+    )
+    verification = verify_paper(
+        "Kucsko et al. (2013). A fabricated paper title. "
+        "doi:10.1038/nature12373"
+    )
+
+    report = render_paper_html(verification)
+
+    assert "Nanometre-scale thermometry in a living cell" in report
+    assert "冲突" in report
+    assert "查看论文页面" in report
+    assert SAMPLE_RECORD["URL"] in report
+    assert "继续人工核查" not in report
+    assert "元数据" not in report
+    assert "Springer Science" not in report
+    assert "匹配度" not in report
+    assert "服务提示" not in report
+    assert report.count('class="action"') == 1
+
+
+def test_unmatched_foreign_title_continues_in_google_scholar() -> None:
+    query = "An unmatched foreign paper"
+    verification = PaperVerification(
+        query=query,
+        query_type="bibliographic",
+        matches=(),
+        search_links=external_search_links(query),
+        verdict="NEEDS_MANUAL",
+    )
+
+    report = render_paper_html(verification)
+
+    assert "继续人工核查" in report
+    assert "scholar.google.com" in report
+    assert "kns.cnki.net" not in report
