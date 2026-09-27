@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
@@ -365,6 +366,26 @@ def discover_reference_pdfs(inputs: list[Path]) -> list[Path]:
     return discover_reference_files(inputs)
 
 
+def _compact_match_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    return "".join(character for character in normalized if character.isalnum())
+
+
+def _reference_filename_score(reference: str, path: Path) -> float:
+    reference_compact = _compact_match_text(reference)
+    filename_segments = (path.stem, *re.split(r"_+", path.stem))
+    if any(
+        len(segment_compact) >= 8 and segment_compact in reference_compact
+        for segment in filename_segments
+        if (segment_compact := _compact_match_text(segment))
+    ):
+        return 100
+    return fuzz.token_set_ratio(
+        reference.casefold(),
+        re.sub(r"[_-]+", " ", path.stem).casefold(),
+    )
+
+
 def _match_reference_files(
     references: dict[int, str], source_paths: list[Path]
 ) -> dict[int, Path]:
@@ -387,10 +408,7 @@ def _match_reference_files(
             continue
         candidates = sorted(
             (
-                fuzz.token_set_ratio(
-                    reference.casefold(),
-                    re.sub(r"[_-]+", " ", path.stem).casefold(),
-                ),
+                _reference_filename_score(reference, path),
                 path,
             )
             for path in unused

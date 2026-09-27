@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 from pathlib import Path
 
 from studylint import AUTHOR_URL, PROJECT_URL
@@ -365,7 +366,15 @@ def _annotation_reason(audit: CitationAudit) -> tuple[str, str] | None:
         details.append(
             f"{ai_label}：{concise(audit.ai_explanation or '需要人工复核。')}"
         )
-    if audit.reference_verdict in {
+    local_source_with_unconfirmed_metadata = (
+        audit.source_status == "LOCAL_FILE"
+        and audit.reference_verdict in {
+            "PARTIAL_MATCH",
+            "NEEDS_MANUAL",
+            "LOOKUP_FAILED",
+        }
+    )
+    if not local_source_with_unconfirmed_metadata and audit.reference_verdict in {
         "PARTIAL_MATCH",
         "METADATA_MISMATCH",
         "RETRACTED",
@@ -381,6 +390,16 @@ def _annotation_reason(audit: CitationAudit) -> tuple[str, str] | None:
     if not details:
         return None
     return "引用核验提示", " ".join(dict.fromkeys(details))
+
+
+def _visible_reference_warnings(warnings: tuple[str, ...]) -> tuple[str, ...]:
+    technical = re.compile(
+        r"HTTP\s+\d{3}|无法解析的数据|暂时不可用|"
+        r"(?:请求|连接|服务).*(?:失败|异常|超时)|"
+        r"(?:urlopen|timeout|ssl|connection)\s*error",
+        re.IGNORECASE,
+    )
+    return tuple(value for value in warnings if not technical.search(value))
 
 
 def _find_annotation_range(text: str, excerpt: str) -> tuple[int, int] | None:
@@ -521,20 +540,32 @@ def render_manuscript_html(
         )
         reference_check = ""
         if audit.reference_verdict or audit.source_status:
-            reference_label = REFERENCE_STATUS.get(
-                audit.reference_verdict, audit.reference_verdict or "未运行"
+            hide_unconfirmed_metadata = (
+                audit.source_status == "LOCAL_FILE"
+                and audit.reference_verdict in {
+                    "PARTIAL_MATCH",
+                    "NEEDS_MANUAL",
+                    "LOOKUP_FAILED",
+                }
+            )
+            reference_label = (
+                ""
+                if hide_unconfirmed_metadata
+                else REFERENCE_STATUS.get(
+                    audit.reference_verdict, audit.reference_verdict
+                )
             )
             source_label = SOURCE_STATUS.get(
                 audit.source_status, audit.source_status or "未运行"
             )
             record_link = (
                 f'<a target="_blank" rel="noopener noreferrer" href="{html.escape(audit.reference_url, quote=True)}">查看文献记录</a>'
-                if audit.reference_url
+                if audit.reference_url and not hide_unconfirmed_metadata
                 else ""
             )
             warnings = "".join(
                 f"<li>{html.escape(value)}</li>"
-                for value in audit.reference_warnings
+                for value in _visible_reference_warnings(audit.reference_warnings)
             )
             warning_block = f'<ul class="warnings">{warnings}</ul>' if warnings else ""
             details = " · ".join(
@@ -545,15 +576,28 @@ def render_manuscript_html(
                 )
                 if value
             )
-            reference_check = (
-                '<div class="reference-check">'
-                f'<strong>文献记录：{html.escape(reference_label)}</strong>'
-                f'<span>原文：{html.escape(source_label)}</span>'
-                f'<span>{html.escape(details)}</span>'
-                f'<p>{html.escape(audit.reference_message)}</p>'
-                f'<p>{html.escape(audit.source_message)}</p>'
-                f'{record_link}{warning_block}</div>'
+            reference_parts = ['<div class="reference-check">']
+            if reference_label:
+                reference_parts.append(
+                    f'<strong>文献记录：{html.escape(reference_label)}</strong>'
+                )
+            reference_parts.extend(
+                (
+                    f'<span>原文：{html.escape(source_label)}</span>',
+                    f'<span>{html.escape(details)}</span>',
+                )
             )
+            if not hide_unconfirmed_metadata:
+                reference_parts.append(
+                    f'<p>{html.escape(audit.reference_message)}</p>'
+                )
+            reference_parts.extend(
+                (
+                    f'<p>{html.escape(audit.source_message)}</p>',
+                    f'{record_link}{warning_block}</div>',
+                )
+            )
+            reference_check = "".join(reference_parts)
         source = (
             f'<p class="source"><strong>用于核验的原文：</strong>{html.escape(audit.source_path)}</p>'
             if audit.source_path

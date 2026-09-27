@@ -5,6 +5,7 @@ from docx import Document
 
 from studylint.fulltext import ReferenceResolution
 from studylint.manuscripts import (
+    _match_reference_files,
     audit_manuscript,
     discover_reference_files,
     extract_citation_claims,
@@ -192,6 +193,21 @@ def test_reference_discovery_accepts_pdf_and_epub(tmp_path: Path) -> None:
     found = discover_reference_files([tmp_path])
 
     assert found == [pdf.resolve(), epub.resolve()]
+
+
+def test_matches_chinese_reference_file_by_full_title_segment(tmp_path: Path) -> None:
+    first = tmp_path / '浅析电视纪录片叙事艺术的“故事化”理念_付春苗.pdf'
+    second = tmp_path / "叙事艺术在人文纪录片中的应用研究_沈芳逸.pdf"
+    first.write_bytes(b"%PDF-test")
+    second.write_bytes(b"%PDF-test")
+    references = {
+        1: '付春苗，李超. 浅析电视纪录片叙事艺术的“故事化”理念[J]. 新闻界，2010（1）：156-157.',
+        2: "沈芳逸. 叙事艺术在人文纪录片中的应用研究[D]. 济南：山东师范大学，2015.",
+    }
+
+    matched = _match_reference_files(references, [first, second])
+
+    assert matched == {1: first, 2: second}
 
 
 def test_scans_high_confidence_document_level_issues(tmp_path: Path) -> None:

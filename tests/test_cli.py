@@ -402,6 +402,41 @@ def test_supported_manuscript_text_is_not_marked_red(tmp_path: Path) -> None:
     assert "没有发现需要在原稿中标红的问题" in report
 
 
+def test_local_source_hides_transient_metadata_failures(tmp_path: Path) -> None:
+    draft = tmp_path / "draft.txt"
+    draft.write_text(
+        "该结论得到原文直接支持 [1]。\n参考文献\n[1] Example.\n",
+        encoding="utf-8",
+    )
+    audit = CitationAudit(
+        claim="该结论得到原文直接支持。",
+        paragraph=1,
+        citation_number=1,
+        reference_text="Example.",
+        source_path="paper.pdf",
+        verdict="DIRECT_SUPPORT",
+        explanation="在论文正文中找到了直接对应的原文。",
+        reference_verdict="NEEDS_MANUAL",
+        reference_message="自动元数据源尚未确认该参考文献。",
+        reference_warnings=(
+            "OpenAlex返回HTTP 429。",
+            "Semantic Scholar返回HTTP 429。",
+            "arXiv返回HTTP 406。",
+            "DBLP返回了无法解析的数据。",
+        ),
+        source_status="LOCAL_FILE",
+        source_message="已优先使用用户导入的本地PDF。",
+    )
+
+    report = render_manuscript_html(draft, [audit])
+
+    assert 'class="problem-text"' not in report
+    assert "已优先使用用户导入的本地PDF" in report
+    assert "HTTP 429" not in report
+    assert "HTTP 406" not in report
+    assert "无法解析的数据" not in report
+
+
 def test_reference_issue_is_annotated_in_reference_list(tmp_path: Path) -> None:
     draft = tmp_path / "draft.md"
     draft.write_text(
