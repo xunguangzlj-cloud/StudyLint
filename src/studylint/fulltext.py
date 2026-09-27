@@ -203,7 +203,7 @@ def _download_pdf(
         url,
         headers={
             "Accept": "application/pdf,application/octet-stream;q=0.8",
-            "User-Agent": "StudyLint/0.6.0 (+https://github.com/xunguangzlj-cloud/StudyLint)",
+            "User-Agent": "StudyLint/0.7.0 (+https://github.com/xunguangzlj-cloud/StudyLint)",
         },
     )
     temporary_path: Path | None = None
@@ -287,7 +287,7 @@ def _discover_pdf_url(
         landing_url,
         headers={
             "Accept": "text/html,application/xhtml+xml,application/pdf;q=0.8",
-            "User-Agent": "StudyLint/0.6.0 (+https://github.com/xunguangzlj-cloud/StudyLint)",
+            "User-Agent": "StudyLint/0.7.0 (+https://github.com/xunguangzlj-cloud/StudyLint)",
         },
     )
     with _open_url(request, timeout) as response:

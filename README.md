@@ -11,7 +11,7 @@
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-4338CA">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-2DD4BF">
-  <img alt="Version 0.6.0" src="https://img.shields.io/badge/Version-0.6.0-F59E0B">
+  <img alt="Version 0.7.0" src="https://img.shields.io/badge/Version-0.7.0-F59E0B">
 </p>
 
 <p align="center">
@@ -28,7 +28,7 @@ It never presents text similarity as verified truth. Deterministic checks need n
 
 ## Features
 
-- **AI summary checking:** accepts Markdown, TXT, DOCX, PDF, and EPUB summaries and compares marked claims against user-supplied trusted materials.
+- **AI summary checking:** accepts Markdown, TXT, DOCX, PDF, and EPUB summaries; detects likely whole-document source mismatches and compares marked claims against user-supplied trusted materials.
 - **Flexible source selection:** select one or more files directly, or recursively load an entire folder.
 - **Page and timestamp validation:** detect missing PDF pages, slide numbers, or transcript timestamps.
 - **Claim-to-location checks:** verify that the cited location has a meaningful textual relationship to the note.
@@ -37,11 +37,11 @@ It never presents text similarity as verified truth. Deterministic checks need n
 - **Evidence suggestions:** show up to three locally matched candidate passages for human review.
 - **Explicit definition conflicts:** compare only clear definition statements or bold term headings, skipping table fields and scenario labels.
 - **Offline HTML reports:** show the reason, suggested action, original note, and clickable local source locations.
-- **Paper checks:** “Does the paper exist?” verifies DOI, title, year, and retraction metadata. “Paper-content hallucination check” connects each claim, citation number, reference entry, and PDF/EPUB full text.
+- **Paper checks:** “Does the paper exist?” verifies DOI, title, year, and retraction status, with CNKI, Google Scholar, and Baidu Scholar links for manual follow-up. “Paper-content hallucination check” connects each claim, citation number, reference entry, and PDF/EPUB full text.
 - **Progress and exact locations:** all three checks show a percentage and current stage. Paper-content reports identify Markdown/TXT lines, DOCX paragraphs, or PDF pages and page-local lines, alongside the exact claim and citation number.
 - **Persistent result access:** after a paper-content check finishes, click “View check results” to reopen the generated report; if automatic opening fails, StudyLint also shows the report path.
 - **Lawful open-full-text retrieval:** local PDF/EPUB files take priority. For high-confidence metadata matches, StudyLint can fetch an openly accessible PDF; failure prompts the user to import a PDF/EPUB and never proves nonexistence.
-- **Optional AI deep review:** users supply their own OpenAI-compatible endpoint, model, and API key, then select fast/strict mode and a general, biomedical, or social-science review skill. Results use 11 controlled issue categories while remaining separate from rule verdicts.
+- **Optional AI deep review:** available for both AI summaries and paper-content checks. Users supply their own OpenAI-compatible endpoint, model, and API key, then select fast/strict mode and a general, biomedical, or social-science review skill.
 - **GUI and CLI:** a file-picker interface for students and command-line/JSON output for developers.
 
 ## Quick start: graphical interface

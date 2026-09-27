@@ -37,6 +37,10 @@ def finding_category(code: str) -> str:
         return "引用完整性"
     if code == "ST005":
         return "内部一致性"
+    if code == "ST011":
+        return "资料相关性"
+    if code in {"ST012", "ST013"}:
+        return "AI语义核验"
     return "事实支持"
 
 
@@ -98,22 +102,24 @@ def render_paper_console(verification: PaperVerification) -> str:
     return render_paper_batch_console([verification])
 
 
-def _paper_result(verification: PaperVerification) -> tuple[str, str, str, str]:
+def _paper_result(
+    verification: PaperVerification,
+) -> tuple[str, str, tuple[tuple[str, str], ...]]:
     status, _ = paper_status(verification)
     match = verification.matches[0] if verification.matches else None
     title = match.title if match and match.title else verification.query
     if match and match.url:
-        return title, status, "查看论文页面", match.url
-    preferred_name = (
-        "在知网搜索"
-        if any("\u4e00" <= char <= "\u9fff" for char in verification.query)
-        else "在Google Scholar搜索"
+        return title, status, (("查看论文页面", match.url),)
+    labels = {
+        "在知网搜索": "知网",
+        "在Google Scholar搜索": "Google Scholar",
+        "在百度学术搜索": "百度学术",
+    }
+    actions = tuple(
+        (labels.get(link.name, link.name), link.url)
+        for link in verification.search_links
     )
-    preferred = next(
-        (link for link in verification.search_links if link.name == preferred_name),
-        verification.search_links[0] if verification.search_links else None,
-    )
-    return title, status, "继续人工核查", preferred.url if preferred else ""
+    return title, status, actions
 
 
 def render_paper_batch_console(verifications: list[PaperVerification]) -> str:
@@ -121,24 +127,34 @@ def render_paper_batch_console(verifications: list[PaperVerification]) -> str:
     pending = [item for item in verifications if item.verdict not in accepted]
     lines = [f"论文核验：{len(pending)}篇需要继续人工核查（通过项未显示）"]
     for verification in pending:
-        title, status, action_label, action_url = _paper_result(verification)
-        action = f"{action_label}：{action_url}" if action_url else action_label
+        title, status, actions = _paper_result(verification)
+        if actions and actions[0][0] == "查看论文页面":
+            action = f"查看论文页面：{actions[0][1]}"
+        else:
+            links = "；".join(f"{label}：{url}" for label, url in actions)
+            action = f"继续人工核查：{links}" if links else "继续人工核查"
         lines.append(f"{title} | {status} | {action}")
     return "\n".join(lines)
 
 
 def _paper_verification_html(verification: PaperVerification) -> str:
-    title, status, action_label, action_url = _paper_result(verification)
-    action = (
+    title, status, actions = _paper_result(verification)
+    action_links = "".join(
         f'<a class="action" target="_blank" rel="noopener noreferrer" '
-        f'href="{html.escape(action_url, quote=True)}">{action_label}</a>'
-        if action_url
+        f'href="{html.escape(url, quote=True)}">{html.escape(label)}</a>'
+        for label, url in actions
+        if url
+    )
+    manual_label = (
+        '<span class="manual-label">继续人工核查</span>'
+        if actions and actions[0][0] != "查看论文页面"
         else ""
     )
     return (
         '<section class="verification">'
         f"<h2>{html.escape(title)}</h2>"
-        f'<div class="result"><span class="status">{html.escape(status)}</span>{action}</div>'
+        f'<div class="result"><span class="status">{html.escape(status)}</span>'
+        f'<div class="actions">{manual_label}{action_links}</div></div>'
         "</section>"
     )
 
@@ -169,7 +185,7 @@ def render_paper_batch_html(verifications: list[PaperVerification]) -> str:
     .summary div {{ padding:12px 18px; background:var(--card); border:1px solid var(--border); border-radius:10px; }}
     .verification,.empty {{ margin:24px 0; padding:24px; background:var(--card); border:1px solid var(--border); border-radius:14px; }}
     .verification>h2 {{ margin:0 0 14px; font-size:22px; }} .result {{ display:flex; align-items:center; justify-content:space-between; gap:16px; }}
-    .status {{ font-weight:700; }} .action {{ display:inline-block; padding:7px 11px; color:var(--accent); border:1px solid #a5b4fc; border-radius:7px; text-decoration:none; }}
+    .status {{ font-weight:700; }} .actions {{ display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }} .manual-label {{ color:var(--muted); font-size:14px; }} .action {{ display:inline-block; padding:7px 11px; color:var(--accent); border:1px solid #a5b4fc; border-radius:7px; text-decoration:none; }}
     .project-support {{ margin-top:24px; padding-top:10px; border-top:1px solid var(--border); color:var(--muted); font-size:12px; text-align:right; }} .project-support a {{ margin-left:10px; color:var(--muted); text-decoration:none; }} .project-support a:hover {{ color:var(--accent); text-decoration:underline; }}
   </style>
 </head>
@@ -759,7 +775,9 @@ def _source_link(source_path: str, locator_type: str, locator_value: int) -> str
     return uri
 
 
-def render_html(notes_path: Path, findings: list[Finding]) -> str:
+def render_html(
+    notes_path: Path, findings: list[Finding], ai_enabled: bool = False
+) -> str:
     counts = summary(findings)
     cards: list[str] = []
     for finding in findings:
@@ -846,7 +864,7 @@ def render_html(notes_path: Path, findings: list[Finding]) -> str:
   </style>
 </head>
 <body><main>
-  <header><h1>AI总结核查报告</h1><div class="meta">对照可信资料，检查已标注来源的引用、事实支持与内部一致性。<br>总结：{html.escape(str(notes_path))}</div></header>
+  <header><h1>AI总结核查报告</h1><div class="meta">对照可信资料，检查整份资料相关性、已标注来源的引用、事实支持与内部一致性。{('<br>可选AI语义复核：已启用（只判断整份总结与资料的主题及覆盖关系，不因单条内容没有引用而判错）。' if ai_enabled else '')}<br>总结：{html.escape(str(notes_path))}</div></header>
   <section class="summary">
     <div><strong>{counts['errors']}</strong>错误</div>
     <div><strong>{counts['warnings']}</strong>警告</div>

@@ -15,6 +15,7 @@ from studylint.ai_audit import (
     AIConfig,
     AI_SKILLS,
     deep_verify_audits,
+    deep_verify_notes,
 )
 from studylint.manuscripts import (
     CitationAudit,
@@ -63,6 +64,7 @@ def check_to_html(
     notes_path: Path,
     source_inputs: Path | list[Path],
     progress: ProgressCallback | None = None,
+    ai_config: AIConfig | None = None,
 ) -> tuple[Path, dict[str, int]]:
     inputs = [source_inputs] if isinstance(source_inputs, Path) else source_inputs
     source_paths: list[Path] = []
@@ -86,10 +88,17 @@ def check_to_html(
     if progress:
         progress(75, "正在核对引用与内部一致性")
     findings = lint(units, sources)
+    if ai_config is not None:
+        if progress:
+            progress(84, "正在进行AI语义复核")
+        findings.extend(deep_verify_notes(units, sources, ai_config))
     if progress:
         progress(92, "正在生成核查报告")
     output = notes_path.with_name(f"{notes_path.stem}-studylint-report.html")
-    output.write_text(render_html(notes_path, findings), encoding="utf-8")
+    output.write_text(
+        render_html(notes_path, findings, ai_enabled=ai_config is not None),
+        encoding="utf-8",
+    )
     if progress:
         progress(100, "核查完成")
     return output, summary(findings)
@@ -236,6 +245,7 @@ def main() -> None:
     manuscript_status = tk.StringVar(value="待核查")
     manuscript_progress = tk.DoubleVar(value=0)
     auto_fetch_fulltext = tk.BooleanVar(value=True)
+    notes_ai_enabled = tk.BooleanVar(value=False)
     ai_enabled = tk.BooleanVar(value=False)
     default_ai_provider = "DeepSeek"
     default_ai_endpoint, default_ai_model = AI_PROVIDER_PRESETS[default_ai_provider]
@@ -354,6 +364,11 @@ def main() -> None:
         if not notes_path.is_file() or not source_inputs:
             messagebox.showerror("无法开始", "请选择有效的笔记文件和课程资料。")
             return
+        try:
+            notes_ai_config = current_ai_config() if notes_ai_enabled.get() else None
+        except ValueError as error:
+            messagebox.showerror("AI设置无效", str(error))
+            return
         notes_button.state(["disabled"])
         set_progress(notes_progress, notes_status, 0, "准备开始核查")
 
@@ -365,6 +380,7 @@ def main() -> None:
                     progress=lambda value, message: queue_progress(
                         notes_progress, notes_status, value, message
                     ),
+                    ai_config=notes_ai_config,
                 )
             except (OSError, ValueError) as error:
                 root.after(0, lambda message=str(error): finish_notes_error(message))
@@ -390,18 +406,29 @@ def main() -> None:
                 f"系统未能自动打开报告，请手动打开：\n{output.resolve()}",
             )
 
+    ttk.Checkbutton(
+        notes_tab,
+        text="启用可选AI语义核验（自备 API Key）",
+        variable=notes_ai_enabled,
+    ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
+    ttk.Button(
+        notes_tab,
+        text="AI设置",
+        command=lambda: open_ai_settings(notes_ai_enabled),
+    ).grid(row=2, column=3, sticky="e", pady=(8, 0))
+
     notes_button = ttk.Button(
         notes_tab,
         text="开始核查",
         command=run_check,
         style="Accent.TButton",
     )
-    notes_button.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(24, 10))
+    notes_button.grid(row=3, column=0, columnspan=4, sticky="ew", pady=(18, 10))
     ttk.Progressbar(
         notes_tab, variable=notes_progress, maximum=100, mode="determinate"
-    ).grid(row=3, column=0, columnspan=4, sticky="ew")
+    ).grid(row=4, column=0, columnspan=4, sticky="ew")
     ttk.Label(notes_tab, textvariable=notes_status, foreground="#4338ca").grid(
-        row=4, column=0, columnspan=4, sticky="w", pady=(6, 0)
+        row=5, column=0, columnspan=4, sticky="w", pady=(6, 0)
     )
     notes_tab.columnconfigure(1, weight=1)
 
@@ -584,7 +611,7 @@ def main() -> None:
         config.validate()
         return config
 
-    def open_ai_settings() -> None:
+    def open_ai_settings(enable_variable) -> None:
         dialog = tk.Toplevel(root)
         dialog.title("可选AI深度核验设置")
         dialog.geometry("620x410")
@@ -658,7 +685,7 @@ def main() -> None:
             except ValueError as error:
                 messagebox.showerror("AI设置无效", str(error), parent=dialog)
                 return
-            ai_enabled.set(True)
+            enable_variable.set(True)
             dialog.destroy()
 
         ttk.Button(
@@ -682,7 +709,9 @@ def main() -> None:
         variable=ai_enabled,
     ).grid(row=3, column=0, columnspan=4, sticky="w", pady=(8, 0))
     ttk.Button(
-        manuscript_tab, text="AI设置", command=open_ai_settings
+        manuscript_tab,
+        text="AI设置",
+        command=lambda: open_ai_settings(ai_enabled),
     ).grid(row=3, column=4, sticky="e", pady=(10, 0))
 
     manuscript_button = ttk.Button(

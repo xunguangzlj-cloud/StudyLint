@@ -750,6 +750,8 @@ def test_batch_report_contains_summary(monkeypatch) -> None:
     assert "需要自行核查 <strong>2</strong> 篇" in report
     assert report.count("继续人工核查") == 2
     assert report.count("kns.cnki.net") == 2
+    assert report.count("scholar.google.com") == 2
+    assert report.count("xueshu.baidu.com") == 2
     assert 'target="_blank"' in report
     assert "一键" not in report
     assert "openManualChecks" not in report
@@ -805,7 +807,7 @@ def test_paper_report_only_shows_title_status_and_one_action(monkeypatch) -> Non
     assert report.count('class="action"') == 1
 
 
-def test_unmatched_foreign_title_continues_in_google_scholar() -> None:
+def test_unmatched_title_has_three_manual_search_entrances() -> None:
     query = "An unmatched foreign paper"
     verification = PaperVerification(
         query=query,
@@ -819,4 +821,8 @@ def test_unmatched_foreign_title_continues_in_google_scholar() -> None:
 
     assert "继续人工核查" in report
     assert "scholar.google.com" in report
-    assert "kns.cnki.net" not in report
+    assert "kns.cnki.net" in report
+    assert "xueshu.baidu.com" in report
+    assert ">知网</a>" in report
+    assert ">Google Scholar</a>" in report
+    assert ">百度学术</a>" in report

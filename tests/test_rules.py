@@ -111,6 +111,39 @@ def test_uncited_claim_is_not_flagged(tmp_path: Path) -> None:
     assert codes == []
 
 
+def test_unrelated_summary_and_sources_are_flagged_once(tmp_path: Path) -> None:
+    codes = _lint(
+        tmp_path,
+        "信息管理课程讨论组织中的信息需求与信息行为。\n"
+        "知识管理关注隐性知识与显性知识的转化。\n"
+        "信息检索需要分析用户查询并评价检索结果。\n"
+        "数据治理涉及组织制度、质量控制和责任分配。",
+        "本讲学习细胞膜的结构、蛋白质运输与离子通道。\n"
+        "实验部分观察叶绿体、线粒体和细胞核。\n"
+        "遗传物质通过复制、转录和翻译表达。",
+    )
+
+    assert codes == ["ST011"]
+
+
+def test_related_summary_and_sources_do_not_trigger_document_mismatch(
+    tmp_path: Path,
+) -> None:
+    codes = _lint(
+        tmp_path,
+        "信息社会以信息和知识作为重要资源。\n"
+        "信息素养包括信息意识、信息知识与信息能力。\n"
+        "数字素养强调安全、负责地使用数字技术。\n"
+        "人工智能素养要求理解并审慎应用智能工具。",
+        "信息社会把信息和知识视为重要资源。\n"
+        "信息素养由信息意识、信息知识、信息能力和信息伦理构成。\n"
+        "数字素养要求安全且负责地使用数字技术。\n"
+        "人工智能素养包括理解、使用和评价智能工具。",
+    )
+
+    assert "ST011" not in codes
+
+
 def test_cited_claim_matches_marked_page(tmp_path: Path) -> None:
     codes = _lint(
         tmp_path,

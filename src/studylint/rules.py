@@ -350,6 +350,45 @@ def _definition_findings(units: list[NoteUnit]) -> list[Finding]:
     return findings
 
 
+def _document_relevance_finding(
+    units: list[NoteUnit], sources: list[SourceDocument]
+) -> Finding | None:
+    meaningful_units = [
+        unit
+        for unit in units
+        if len(_normalize(CITATION_PATTERN.sub("", unit.text))) >= 8
+        and not unit.text.lstrip().startswith("|")
+        and unit.text.strip() != "---"
+    ]
+    source_spans = [
+        span for source in sources for span in source.spans if span.text.strip()
+    ]
+    if len(meaningful_units) < 4 or not source_spans:
+        return None
+
+    scores = [
+        max(_support_score(unit.text, span.text) for span in source_spans)
+        for unit in meaningful_units
+    ]
+    coverage = sum(score >= 28 for score in scores) / len(scores)
+    average = sum(scores) / len(scores)
+    if coverage >= 0.25 or average >= 25:
+        return None
+
+    return Finding(
+        "ST011",
+        "error",
+        meaningful_units[0].line,
+        f"整份总结与所选资料的整体关联很低（高关联段落约{round(coverage * 100)}%）。",
+        title="总结与资料可能不相关",
+        action=(
+            "请确认是否选错课程资料。此提示只判断整份文件的关联性，"
+            "不会因为单条结论没有来源标注就判错。"
+        ),
+        note_text=meaningful_units[0].text,
+    )
+
+
 def lint(units: list[NoteUnit], sources: list[SourceDocument]) -> list[Finding]:
     source_lookup = _source_map(sources)
     findings: list[Finding] = []
@@ -372,4 +411,7 @@ def lint(units: list[NoteUnit], sources: list[SourceDocument]) -> list[Finding]:
         if support and support.code not in unit.ignored_codes:
             findings.append(support)
     findings.extend(_definition_findings(units))
+    relevance = _document_relevance_finding(units, sources)
+    if relevance:
+        findings.append(relevance)
     return sorted(findings, key=lambda finding: (finding.line, finding.code))

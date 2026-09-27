@@ -7,11 +7,15 @@ from studylint.ai_audit import (
     AIConfig,
     _extract_json,
     _request_completion,
+    _notes_system_prompt,
+    _notes_user_prompt,
     _system_prompt,
     deep_verify_audits,
+    deep_verify_notes,
 )
 from studylint.claims import ClaimEvidence
 from studylint.manuscripts import CitationAudit
+from studylint.models import NoteUnit, SourceDocument, SourceSpan
 from studylint.reporters import render_manuscript_html
 
 
@@ -38,6 +42,31 @@ def make_config(mode: str = "fast") -> AIConfig:
         mode=mode,
         skill="biomedical",
     )
+
+
+def make_notes_and_sources(tmp_path):
+    units = [
+        NoteUnit(1, "信息管理课程讨论组织中的信息需求与信息行为。", ()),
+        NoteUnit(2, "知识管理关注隐性知识与显性知识的转化。", ()),
+    ]
+    source_path = tmp_path / "slides.md"
+    source_path.write_text("信息社会与信息素养课程材料", encoding="utf-8")
+    sources = [
+        SourceDocument(
+            source_path.name,
+            source_path,
+            "md",
+            [
+                SourceSpan(
+                    source_path.name,
+                    "page",
+                    1,
+                    "信息社会以信息和知识为重要资源，信息素养包括信息意识与能力。",
+                )
+            ],
+        )
+    ]
+    return units, sources
 
 
 def test_provider_presets_use_complete_https_endpoints() -> None:
@@ -89,6 +118,53 @@ def test_system_prompt_requires_evidence_and_limits_authenticity_claims() -> Non
     assert "无法证明实验是否真实实施" in prompt
     assert "INSUFFICIENT" in prompt
     assert "不得断言造假、伪造、违规或未实施" in prompt
+
+
+def test_notes_prompt_only_checks_global_alignment_and_respects_uncited_claims(
+    tmp_path,
+) -> None:
+    units, sources = make_notes_and_sources(tmp_path)
+    prompt = _notes_system_prompt(make_config("strict"))
+    payload = json.loads(_notes_user_prompt(units, sources))
+
+    assert "整份总结" in prompt
+    assert "没有来源标注" in prompt
+    assert "不能据此判错" in prompt
+    assert payload["summary_units"]
+    assert payload["source_materials"][0]["name"] == "slides.md"
+
+
+def test_notes_ai_reports_unrelated_document_once(monkeypatch, tmp_path) -> None:
+    units, sources = make_notes_and_sources(tmp_path)
+    monkeypatch.setattr(
+        "studylint.ai_audit._request_notes_completion",
+        lambda config, note_units, source_documents: {
+            "verdict": "UNRELATED",
+            "confidence": 96,
+            "explanation": "总结与资料属于不同课程。",
+        },
+    )
+
+    findings = deep_verify_notes(units, sources, make_config())
+
+    assert [finding.code for finding in findings] == ["ST012"]
+    assert findings[0].severity == "error"
+    assert "96%" in findings[0].message
+    assert "test-key" not in findings[0].message
+
+
+def test_notes_ai_related_result_adds_no_finding(monkeypatch, tmp_path) -> None:
+    units, sources = make_notes_and_sources(tmp_path)
+    monkeypatch.setattr(
+        "studylint.ai_audit._request_notes_completion",
+        lambda config, note_units, source_documents: {
+            "verdict": "RELATED",
+            "confidence": 91,
+            "explanation": "主题一致。",
+        },
+    )
+
+    assert deep_verify_notes(units, sources, make_config()) == []
 
 
 def test_openai_compatible_request_uses_bearer_key_and_structured_prompt(

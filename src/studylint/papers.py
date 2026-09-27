@@ -173,7 +173,7 @@ def _request_text(url: str, timeout: int = 12) -> str:
         url,
         headers={
             "Accept": "application/atom+xml, application/xml, text/xml",
-            "User-Agent": "StudyLint/0.6.0 (https://github.com/xunguangzlj-cloud/StudyLint)",
+            "User-Agent": "StudyLint/0.7.0 (https://github.com/xunguangzlj-cloud/StudyLint)",
         },
     )
     try:

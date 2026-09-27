@@ -172,6 +172,37 @@ def test_gui_check_accepts_individual_source_files(tmp_path: Path) -> None:
     assert counts["warnings"] == 0
 
 
+def test_gui_check_can_add_optional_ai_summary_finding(monkeypatch, tmp_path: Path) -> None:
+    from studylint.ai_audit import AIConfig
+
+    notes = tmp_path / "notes.txt"
+    source = tmp_path / "slides.txt"
+    notes.write_text("这是需要进行语义复核的课程总结内容。", encoding="utf-8")
+    source.write_text("这是用于对照的课程资料内容。", encoding="utf-8")
+    monkeypatch.setattr(
+        "studylint.gui.deep_verify_notes",
+        lambda units, sources, config: [
+            Finding(
+                "ST012",
+                "error",
+                1,
+                "AI判断整份总结与资料不相关。",
+                title="AI判断：总结与资料不匹配",
+            )
+        ],
+    )
+    config = AIConfig(
+        endpoint="http://localhost:8000/v1/chat/completions",
+        model="test-model",
+        api_key="test-key",
+    )
+
+    output, counts = check_to_html(notes, source, ai_config=config)
+
+    assert counts["errors"] == 1
+    assert "AI判断：总结与资料不匹配" in output.read_text(encoding="utf-8")
+
+
 def sample_verification() -> PaperVerification:
     return PaperVerification(
         query="测试论文",
