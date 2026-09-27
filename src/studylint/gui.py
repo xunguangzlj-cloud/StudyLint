@@ -678,12 +678,12 @@ def main() -> None:
 
     ttk.Checkbutton(
         manuscript_tab,
-        text="启用可选AI深度核验（使用者自行提供API Key）",
+        text="启用可选AI深度核验（自备 API Key）",
         variable=ai_enabled,
-    ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(8, 0))
+    ).grid(row=3, column=0, columnspan=4, sticky="w", pady=(8, 0))
     ttk.Button(
         manuscript_tab, text="AI设置", command=open_ai_settings
-    ).grid(row=3, column=3, columnspan=2, sticky="e", pady=(10, 0))
+    ).grid(row=3, column=4, sticky="e", pady=(10, 0))
 
     manuscript_button = ttk.Button(
         manuscript_tab, text="开始论文内容核查", style="Accent.TButton"
